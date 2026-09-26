@@ -113,6 +113,7 @@ export interface BuyCandidate {
   selling_price: number | null;
   amazon_referral_fee: number | null;
   fba_fulfilment_fee: number | null;
+  digital_services_fee: number | null;
   total_amazon_fees: number | null;
   break_even_price: number | null;
 }

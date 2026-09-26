@@ -151,7 +151,7 @@ export default async function Page() {
         sub={`Top ${Math.min(
           data.buy_candidates.length,
           30
-        )} by score — selling price, fees, contribution and break-even come straight from the VAT + FBA Profitability engines; SKU, order qty and VAT cost preview what Buy Decision & PO Drafting (08) would draft today. No AI in any of these numbers.`}
+        )} by score — selling price, fees (referral + FBA + Amazon's Digital Services Fee), contribution and break-even come straight from the VAT + FBA Profitability engines; SKU, order qty and VAT cost preview what Buy Decision & PO Drafting (08) would draft today. No AI in any of these numbers.`}
       >
         <DataCard>
           <div style={{ overflowX: "auto" }}>
@@ -201,6 +201,7 @@ export default async function Page() {
                         {c.amazon_referral_fee != null && c.fba_fulfilment_fee != null ? (
                           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                             {gbp(c.amazon_referral_fee)} referral + {gbp(c.fba_fulfilment_fee)} FBA
+                            {c.digital_services_fee != null ? <> + {gbp(c.digital_services_fee)} DST</> : null}
                           </div>
                         ) : null}
                       </td>
