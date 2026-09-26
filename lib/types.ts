@@ -110,6 +110,11 @@ export interface BuyCandidate {
   quantity_to_order: number;
   line_cost_ex_vat: number | null;
   line_cost_inc_vat: number | null;
+  selling_price: number | null;
+  amazon_referral_fee: number | null;
+  fba_fulfilment_fee: number | null;
+  total_amazon_fees: number | null;
+  break_even_price: number | null;
 }
 
 export interface PoPipelineRow {

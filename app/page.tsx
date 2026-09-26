@@ -148,7 +148,10 @@ export default async function Page() {
       {/* Buy candidates table */}
       <Section
         title="Buy candidates"
-        sub={`Top ${Math.min(data.buy_candidates.length, 30)} by score — SKU, order qty and VAT breakdown are a preview of what Buy Decision & PO Drafting (08) would draft today, deterministic scoring, no AI in the numbers`}
+        sub={`Top ${Math.min(
+          data.buy_candidates.length,
+          30
+        )} by score — selling price, fees, contribution and break-even come straight from the VAT + FBA Profitability engines; SKU, order qty and VAT cost preview what Buy Decision & PO Drafting (08) would draft today. No AI in any of these numbers.`}
       >
         <DataCard>
           <div style={{ overflowX: "auto" }}>
@@ -158,9 +161,12 @@ export default async function Page() {
                   <th style={th}>ASIN</th>
                   <th style={th}>SKU</th>
                   <th style={th}>Score</th>
+                  <th style={th}>Selling price</th>
+                  <th style={th}>Amazon fees</th>
+                  <th style={th}>Contribution (profit/unit)</th>
                   <th style={th}>Margin</th>
                   <th style={th}>ROI</th>
-                  <th style={th}>Contribution</th>
+                  <th style={th}>Break-even price</th>
                   <th style={th}>Qty to order</th>
                   <th style={th}>Unit cost (ex VAT)</th>
                   <th style={th}>Unit cost (inc VAT)</th>
@@ -172,7 +178,7 @@ export default async function Page() {
               </thead>
               <tbody>
                 {data.buy_candidates.length === 0 ? (
-                  <EmptyRow colSpan={13} label="No buy candidates right now." />
+                  <EmptyRow colSpan={16} label="No buy candidates right now." />
                 ) : (
                   data.buy_candidates.map((c) => (
                     <tr key={c.asin}>
@@ -188,13 +194,27 @@ export default async function Page() {
                         {num(c.score)}
                       </td>
                       <td style={{ ...td }} className="tabular">
+                        {gbp(c.selling_price)}
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)" }} className="tabular">
+                        {gbp(c.total_amazon_fees)}
+                        {c.amazon_referral_fee != null && c.fba_fulfilment_fee != null ? (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                            {gbp(c.amazon_referral_fee)} referral + {gbp(c.fba_fulfilment_fee)} FBA
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                        {gbp(c.contribution)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
                         {pct(c.margin)}
                       </td>
                       <td style={{ ...td }} className="tabular">
                         {pct(c.roi)}
                       </td>
                       <td style={{ ...td }} className="tabular">
-                        {gbp(c.contribution)}
+                        {gbp(c.break_even_price)}
                       </td>
                       <td style={{ ...td }} className="tabular">
                         {num(c.quantity_to_order)}
