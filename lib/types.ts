@@ -158,6 +158,21 @@ export interface ReturnsSummary {
   refund_30d: number;
 }
 
+export interface WorkflowHealthItem {
+  workflow: string;
+  errors_24h: number;
+  errors_7d: number;
+  last_error_at: string;
+  last_error_message: string;
+}
+
+export interface WorkflowHealthSummary {
+  workflows_with_errors_24h: number;
+  total_errors_24h: number;
+  total_errors_7d: number;
+  last_error_at: string | null;
+}
+
 export interface DashboardPayload {
   generated_at: string;
   daily_summary: DailySummary | null;
@@ -169,4 +184,6 @@ export interface DashboardPayload {
   account_health_summary: AccountHealthSummary;
   recent_alerts: RecentAlert[];
   returns_summary: ReturnsSummary;
+  workflow_health: WorkflowHealthItem[];
+  workflow_health_summary: WorkflowHealthSummary;
 }

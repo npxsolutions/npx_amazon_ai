@@ -88,9 +88,9 @@ export default async function Page() {
         />
         <StatTile
           label="Workflow errors (24h)"
-          value={num(ds?.workflow_errors_24h?.count ?? 0)}
-          sub={ds?.workflow_errors_24h?.workflows?.join(", ") || "none"}
-          tone={(ds?.workflow_errors_24h?.count ?? 0) > 0 ? "critical" : "good"}
+          value={num(data.workflow_health_summary.total_errors_24h)}
+          sub={data.workflow_health.length ? data.workflow_health.map((w) => w.workflow).join(", ") : "none"}
+          tone={data.workflow_health_summary.total_errors_24h > 0 ? "critical" : "good"}
         />
         <StatTile
           label="Account health flags"
@@ -340,6 +340,66 @@ export default async function Page() {
                       <td style={{ ...td, color: "var(--text-secondary)" }}>{a.detail}</td>
                       <td style={{ ...td, color: "var(--text-muted)" }} className="tabular">
                         {dateShort(a.observed_at)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      {/* Workflow health */}
+      <Section
+        title="Workflow health"
+        sub="Every failure across the 39-workflow pipeline reports here via Central Error Logger — a clean run shows nothing"
+      >
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <StatTile
+            label="Workflows affected (24h)"
+            value={num(data.workflow_health_summary.workflows_with_errors_24h)}
+            tone={data.workflow_health_summary.workflows_with_errors_24h > 0 ? "critical" : "good"}
+          />
+          <StatTile
+            label="Errors (24h)"
+            value={num(data.workflow_health_summary.total_errors_24h)}
+            tone={data.workflow_health_summary.total_errors_24h > 0 ? "critical" : "good"}
+          />
+          <StatTile
+            label="Errors (7d)"
+            value={num(data.workflow_health_summary.total_errors_7d)}
+            tone={data.workflow_health_summary.total_errors_7d > 0 ? "warning" : "good"}
+          />
+        </div>
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>Workflow</th>
+                  <th style={th}>Errors (24h)</th>
+                  <th style={th}>Errors (7d)</th>
+                  <th style={th}>Last error</th>
+                  <th style={th}>When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.workflow_health.length === 0 ? (
+                  <EmptyRow colSpan={5} label="No workflow errors in the last 7 days — everything's running clean." />
+                ) : (
+                  data.workflow_health.map((w) => (
+                    <tr key={w.workflow}>
+                      <td style={{ ...td, fontWeight: 600 }}>{w.workflow}</td>
+                      <td style={{ ...td }} className="tabular">
+                        {w.errors_24h > 0 ? <Badge label={String(w.errors_24h)} tone="critical" /> : num(w.errors_24h)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(w.errors_7d)}
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)" }}>{w.last_error_message}</td>
+                      <td style={{ ...td, color: "var(--text-muted)" }} className="tabular">
+                        {relativeTime(w.last_error_at)}
                       </td>
                     </tr>
                   ))
