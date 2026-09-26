@@ -146,25 +146,33 @@ export default async function Page() {
       </div>
 
       {/* Buy candidates table */}
-      <Section title="Buy candidates" sub={`Top ${Math.min(data.buy_candidates.length, 30)} by score, deterministic scoring — no AI in the numbers`}>
+      <Section
+        title="Buy candidates"
+        sub={`Top ${Math.min(data.buy_candidates.length, 30)} by score — SKU, order qty and VAT breakdown are a preview of what Buy Decision & PO Drafting (08) would draft today, deterministic scoring, no AI in the numbers`}
+      >
         <DataCard>
           <div style={{ overflowX: "auto" }}>
             <table>
               <thead>
                 <tr>
                   <th style={th}>ASIN</th>
+                  <th style={th}>SKU</th>
                   <th style={th}>Score</th>
                   <th style={th}>Margin</th>
                   <th style={th}>ROI</th>
                   <th style={th}>Contribution</th>
-                  <th style={th}>Capital req.</th>
+                  <th style={th}>Qty to order</th>
+                  <th style={th}>Unit cost (ex VAT)</th>
+                  <th style={th}>Unit cost (inc VAT)</th>
+                  <th style={th}>Order cost (ex VAT)</th>
+                  <th style={th}>Order cost (inc VAT)</th>
                   <th style={th}>Listable</th>
                   <th style={th}>Risks</th>
                 </tr>
               </thead>
               <tbody>
                 {data.buy_candidates.length === 0 ? (
-                  <EmptyRow colSpan={8} label="No buy candidates right now." />
+                  <EmptyRow colSpan={13} label="No buy candidates right now." />
                 ) : (
                   data.buy_candidates.map((c) => (
                     <tr key={c.asin}>
@@ -172,6 +180,9 @@ export default async function Page() {
                         <a href={`https://www.amazon.co.uk/dp/${c.asin}`} target="_blank" rel="noreferrer">
                           {c.asin}
                         </a>
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)" }} className="tabular">
+                        {c.supplier_sku ?? "—"}
                       </td>
                       <td style={{ ...td }} className="tabular">
                         {num(c.score)}
@@ -186,7 +197,22 @@ export default async function Page() {
                         {gbp(c.contribution)}
                       </td>
                       <td style={{ ...td }} className="tabular">
-                        {gbp(c.capital_required)}
+                        {num(c.quantity_to_order)}
+                        {c.supplier_stock != null ? (
+                          <span style={{ color: "var(--text-muted)" }}> / {num(c.supplier_stock)} in stock</span>
+                        ) : null}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {gbp(c.unit_cost_ex_vat)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {gbp(c.unit_cost_inc_vat)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {gbp(c.line_cost_ex_vat)}
+                      </td>
+                      <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                        {gbp(c.line_cost_inc_vat)}
                       </td>
                       <td style={td}>
                         <Badge label={truthy(c.listable) ? "listable" : "blocked"} tone={truthy(c.listable) ? "good" : "warning"} />

@@ -103,6 +103,13 @@ export interface BuyCandidate {
   capital_required: number;
   listable: string | boolean;
   risks: string[];
+  supplier_sku: string | null;
+  unit_cost_ex_vat: number | null;
+  unit_cost_inc_vat: number | null;
+  supplier_stock: number | null;
+  quantity_to_order: number;
+  line_cost_ex_vat: number | null;
+  line_cost_inc_vat: number | null;
 }
 
 export interface PoPipelineRow {
