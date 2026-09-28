@@ -4,6 +4,7 @@ import Badge, { toneFor } from "@/components/Badge";
 import StatTile from "@/components/StatTile";
 import Section from "@/components/Section";
 import DataCard, { th, td, EmptyRow } from "@/components/DataCard";
+import ApprovalButtons from "@/components/ApprovalButtons";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -386,7 +387,12 @@ export default async function Page() {
                         {gbp(r.min_price)} – {gbp(r.max_price)}
                       </td>
                       <td style={td}>
-                        <Badge label={r.approval_status} />
+                        <ApprovalButtons
+                          status={r.approval_status}
+                          id={r.id}
+                          approveAction="approve_repricing"
+                          rejectAction="reject_repricing"
+                        />
                       </td>
                       <td style={{ ...td, color: "var(--text-secondary)", maxWidth: 360 }}>{r.reason ?? "—"}</td>
                     </tr>
@@ -427,7 +433,12 @@ export default async function Page() {
                         <Badge label={po.status} />
                       </td>
                       <td style={td}>
-                        <Badge label={po.approval_status} />
+                        <ApprovalButtons
+                          status={po.approval_status}
+                          id={po.id}
+                          approveAction="approve_po"
+                          rejectAction="reject_po"
+                        />
                       </td>
                       <td style={{ ...td }} className="tabular">
                         {gbp(po.total_inc_vat)}

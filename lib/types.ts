@@ -204,6 +204,7 @@ export interface SupplierRow {
 }
 
 export interface RepricingRow {
+  id: number;
   asin: string;
   product_id: number;
   selling_state: string;
