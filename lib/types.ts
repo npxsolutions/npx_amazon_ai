@@ -186,6 +186,68 @@ export interface WorkflowHealthSummary {
   last_error_at: string | null;
 }
 
+export interface SupplierRow {
+  id: number;
+  name: string;
+  supplier_code: string | null;
+  status: string;
+  reliability_score: number | null;
+  default_lead_time_days: number | null;
+  product_count: number;
+  last_sync_status: string | null;
+  last_sync_at: string | null;
+  last_sync_finished_at: string | null;
+  records_processed: number | null;
+  records_changed: number | null;
+  records_failed: number | null;
+  last_sync_error: string | null;
+}
+
+export interface RepricingRow {
+  asin: string;
+  product_id: number;
+  selling_state: string;
+  min_price: number | null;
+  target_price: number | null;
+  max_price: number | null;
+  current_price: number | null;
+  recommended_price: number | null;
+  price_change_pct: number | null;
+  reason: string | null;
+  requires_approval: boolean;
+  approval_status: string;
+  created_at: string;
+}
+
+export interface RepricingSummary {
+  total_tracked: number;
+  pending_approval: number;
+  price_increases: number;
+  price_decreases: number;
+}
+
+export interface InventoryRow {
+  asin: string;
+  sku: string | null;
+  title: string | null;
+  sellable: number | null;
+  reserved: number | null;
+  inbound: number | null;
+  available: number | null;
+  days_cover: number | null;
+  stockout_risk: string | null;
+  inventory_value: number | null;
+  recommendation: string | null;
+  recommended_qty: number | null;
+}
+
+export interface InventorySummary {
+  total_skus: number;
+  low_days_cover: number;
+  no_days_cover_data: number;
+  total_inventory_value: number;
+}
+
 export interface DashboardPayload {
   generated_at: string;
   daily_summary: DailySummary | null;
@@ -195,6 +257,11 @@ export interface DashboardPayload {
   cashflow: Cashflow | null;
   account_health_alerts: AccountHealthAlert[];
   account_health_summary: AccountHealthSummary;
+  suppliers: SupplierRow[];
+  repricing: RepricingRow[];
+  repricing_summary: RepricingSummary;
+  inventory: InventoryRow[];
+  inventory_summary: InventorySummary;
   recent_alerts: RecentAlert[];
   returns_summary: ReturnsSummary;
   workflow_health: WorkflowHealthItem[];

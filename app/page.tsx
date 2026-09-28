@@ -258,6 +258,146 @@ export default async function Page() {
         </DataCard>
       </Section>
 
+      {/* Suppliers */}
+      <Section title="Suppliers" sub="Connected supplier connectors, sync status and catalogue coverage">
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <StatTile label="Connected suppliers" value={num(data.suppliers.length)} />
+          <StatTile
+            label="Total SKUs"
+            value={num(data.suppliers.reduce((sum, s) => sum + (s.product_count ?? 0), 0))}
+          />
+        </div>
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>Supplier</th>
+                  <th style={th}>Status</th>
+                  <th style={th}>SKUs</th>
+                  <th style={th}>Last sync</th>
+                  <th style={th}>Sync result</th>
+                  <th style={th}>Lead time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.suppliers.length === 0 ? (
+                  <EmptyRow colSpan={6} label="No suppliers connected." />
+                ) : (
+                  data.suppliers.map((s) => (
+                    <tr key={s.id}>
+                      <td style={{ ...td, fontWeight: 600 }}>
+                        {s.name}
+                        {s.supplier_code ? (
+                          <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> ({s.supplier_code})</span>
+                        ) : null}
+                      </td>
+                      <td style={td}>
+                        <Badge label={s.status} />
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(s.product_count)}
+                      </td>
+                      <td style={{ ...td, color: "var(--text-muted)" }} className="tabular">
+                        {relativeTime(s.last_sync_at)}
+                      </td>
+                      <td style={td}>
+                        {s.last_sync_status ? <Badge label={s.last_sync_status} /> : "—"}
+                        {s.records_failed ? (
+                          <div style={{ fontSize: 11, color: "var(--status-critical)" }}>{s.records_failed} failed</div>
+                        ) : null}
+                        {s.last_sync_error ? (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.last_sync_error}</div>
+                        ) : null}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {s.default_lead_time_days != null ? `${s.default_lead_time_days}d` : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      {/* Repricing */}
+      <Section
+        title="Repricing"
+        sub="Pricing engine recommendations — pipeline stage only, nothing here has been pushed live to Amazon"
+      >
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <StatTile label="Tracked ASINs" value={num(data.repricing_summary.total_tracked)} />
+          <StatTile
+            label="Pending approval"
+            value={num(data.repricing_summary.pending_approval)}
+            tone={data.repricing_summary.pending_approval > 0 ? "warning" : "good"}
+          />
+          <StatTile label="Recommending increase" value={num(data.repricing_summary.price_increases)} tone="good" />
+          <StatTile label="Recommending decrease" value={num(data.repricing_summary.price_decreases)} tone="serious" />
+        </div>
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>ASIN</th>
+                  <th style={th}>Current</th>
+                  <th style={th}>Recommended</th>
+                  <th style={th}>Change</th>
+                  <th style={th}>Min / Max band</th>
+                  <th style={th}>Approval</th>
+                  <th style={th}>Reasoning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.repricing.length === 0 ? (
+                  <EmptyRow colSpan={7} label="No repricing recommendations yet." />
+                ) : (
+                  data.repricing.map((r) => (
+                    <tr key={r.asin}>
+                      <td style={td}>
+                        <a href={`https://www.amazon.co.uk/dp/${r.asin}`} target="_blank" rel="noreferrer">
+                          {r.asin}
+                        </a>
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {gbp(r.current_price)}
+                      </td>
+                      <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                        {gbp(r.recommended_price)}
+                      </td>
+                      <td
+                        style={{
+                          ...td,
+                          color:
+                            (r.price_change_pct ?? 0) > 0
+                              ? "var(--status-good)"
+                              : (r.price_change_pct ?? 0) < 0
+                              ? "var(--status-critical)"
+                              : "var(--text-muted)",
+                        }}
+                        className="tabular"
+                      >
+                        {r.price_change_pct != null ? `${r.price_change_pct > 0 ? "+" : ""}${pct(r.price_change_pct, 1)}` : "—"}
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)" }} className="tabular">
+                        {gbp(r.min_price)} – {gbp(r.max_price)}
+                      </td>
+                      <td style={td}>
+                        <Badge label={r.approval_status} />
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)", maxWidth: 360 }}>{r.reason ?? "—"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
       {/* PO pipeline */}
       <Section title="Purchase order pipeline">
         <DataCard>
@@ -314,6 +454,162 @@ export default async function Page() {
             </table>
           </div>
         </DataCard>
+      </Section>
+
+      {/* Inventory */}
+      <Section title="Inventory" sub="Live FBA stock levels and replenishment recommendations">
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+          <StatTile label="SKUs tracked" value={num(data.inventory_summary.total_skus)} />
+          <StatTile
+            label="Low cover (<14d)"
+            value={num(data.inventory_summary.low_days_cover)}
+            tone={data.inventory_summary.low_days_cover > 0 ? "warning" : "good"}
+          />
+          <StatTile label="Inventory value" value={gbp(data.inventory_summary.total_inventory_value)} />
+        </div>
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>ASIN</th>
+                  <th style={th}>SKU</th>
+                  <th style={th}>Sellable</th>
+                  <th style={th}>Reserved</th>
+                  <th style={th}>Inbound</th>
+                  <th style={th}>Days cover</th>
+                  <th style={th}>Value</th>
+                  <th style={th}>Recommendation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.inventory.length === 0 ? (
+                  <EmptyRow colSpan={8} label="No FBA inventory data yet." />
+                ) : (
+                  data.inventory.map((i) => (
+                    <tr key={i.asin}>
+                      <td style={td}>
+                        <a href={`https://www.amazon.co.uk/dp/${i.asin}`} target="_blank" rel="noreferrer">
+                          {i.asin}
+                        </a>
+                      </td>
+                      <td style={{ ...td, color: "var(--text-secondary)" }} className="tabular">
+                        {i.sku ?? "—"}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(i.sellable)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(i.reserved)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(i.inbound)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {i.days_cover != null ? `${num(i.days_cover)}d` : "—"}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {gbp(i.inventory_value)}
+                      </td>
+                      <td style={td}>
+                        {i.recommendation ? (
+                          <Badge label={i.recommendation} tone={i.recommendation === "stockout_reorder" ? "critical" : "warning"} />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      {/* AI Controller */}
+      <Section
+        title="AI Controller"
+        sub="Deterministic daily reasoning behind today's priority action — every figure sourced from the tables above, nothing here is AI-generated"
+      >
+        {ds?.risk_candidates?.length ? (
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 8px" }}>Risk candidates (ranked by urgency)</h3>
+            <DataCard>
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={th}>Urgency</th>
+                      <th style={th}>Category</th>
+                      <th style={th}>Summary</th>
+                      <th style={th}>Recommended action</th>
+                      <th style={th}>Exposure</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ds.risk_candidates.map((r, i) => (
+                      <tr key={i}>
+                        <td style={td}>
+                          <Badge label={String(r.score)} tone={r.score >= 80 ? "critical" : r.score >= 60 ? "serious" : "warning"} />
+                        </td>
+                        <td style={{ ...td, color: "var(--text-secondary)" }}>{r.category}</td>
+                        <td style={td}>{r.summary}</td>
+                        <td style={{ ...td, color: "var(--text-secondary)" }}>{r.action}</td>
+                        <td style={{ ...td }} className="tabular">
+                          {r.exposure_gbp != null ? gbp(r.exposure_gbp) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DataCard>
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          {ds?.products_to_scale?.length ? (
+            <MiniList
+              title="Worth scaling"
+              tone="good"
+              items={ds.products_to_scale.map((p) => `${p.asin} — score ${p.score}, margin ${pct(p.margin)}`)}
+            />
+          ) : null}
+          {ds?.products_to_investigate?.length ? (
+            <MiniList
+              title="Needs investigation"
+              tone="warning"
+              items={ds.products_to_investigate.map((p) => `${p.asin} — ${p.reason ?? p.status}`)}
+            />
+          ) : null}
+          {ds?.products_to_stop?.length ? (
+            <MiniList
+              title="Stop buying"
+              tone="critical"
+              items={(ds.products_to_stop as Record<string, any>[]).map(
+                (p) => `${p.asin} — contribution ${gbp(p.contribution)}`
+              )}
+            />
+          ) : null}
+          {ds?.products_declining_economics?.length ? (
+            <MiniList
+              title="Declining economics"
+              tone="serious"
+              items={(ds.products_declining_economics as Record<string, any>[]).map(
+                (p) => `${p.asin} — margin ${pct(p.margin)}`
+              )}
+            />
+          ) : null}
+        </div>
+
+        {!ds?.risk_candidates?.length &&
+        !ds?.products_to_scale?.length &&
+        !ds?.products_to_investigate?.length &&
+        !ds?.products_to_stop?.length &&
+        !ds?.products_declining_economics?.length ? (
+          <p style={{ color: "var(--text-muted)", fontSize: 13 }}>No controller flags right now.</p>
+        ) : null}
       </Section>
 
       {/* Compliance issues */}
@@ -506,6 +802,56 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div>
       <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 600 }}>{value}</div>
+    </div>
+  );
+}
+
+function MiniList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: "good" | "warning" | "serious" | "critical";
+}) {
+  const toneColor: Record<typeof tone, string> = {
+    good: "var(--status-good)",
+    warning: "var(--status-warning)",
+    serious: "var(--status-serious)",
+    critical: "var(--status-critical)",
+  };
+  const shown = items.slice(0, 6);
+  return (
+    <div style={{ flex: "1 1 260px" }}>
+      <DataCard>
+        <div
+          style={{
+            padding: "10px 14px",
+            borderBottom: "1px solid var(--gridline)",
+            fontSize: 12,
+            fontWeight: 600,
+            color: toneColor[tone],
+          }}
+        >
+          {title} ({items.length})
+        </div>
+        <ul style={{ margin: 0, padding: "4px 14px 8px", listStyle: "none" }}>
+          {shown.map((it, i) => (
+            <li
+              key={i}
+              style={{
+                fontSize: 12.5,
+                color: "var(--text-secondary)",
+                padding: "5px 0",
+                borderBottom: i < shown.length - 1 ? "1px solid var(--gridline)" : "none",
+              }}
+            >
+              {it}
+            </li>
+          ))}
+        </ul>
+      </DataCard>
     </div>
   );
 }
