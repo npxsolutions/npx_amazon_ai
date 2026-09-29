@@ -125,6 +125,28 @@ export interface BuyCandidate {
   listing_issues: unknown[] | null;
 }
 
+export interface EligibleSku {
+  asin: string;
+  product_title: string | null;
+  brand: string | null;
+  supplier_sku: string | null;
+  supplier_stock: number | null;
+  score: number | null;
+  margin: number | null;
+  roi: number | null;
+  contribution: number | null;
+  capital_required: number | null;
+  opportunity_status: string | null;
+  listing_status: string | null;
+  eligibility_checked_at: string;
+}
+
+export interface EligibleSkusSummary {
+  total_eligible: number;
+  scored: number;
+  not_yet_scored: number;
+}
+
 export interface PoPipelineRow {
   id: number;
   po_number: string;
@@ -261,6 +283,8 @@ export interface DashboardPayload {
   daily_summary: DailySummary | null;
   buy_candidates: BuyCandidate[];
   opportunity_counts: { buy_candidate: number; review: number; reject: number; top_score: number | null };
+  eligible_skus: EligibleSku[];
+  eligible_skus_summary: EligibleSkusSummary;
   po_pipeline: PoPipelineRow[];
   cashflow: Cashflow | null;
   account_health_alerts: AccountHealthAlert[];
