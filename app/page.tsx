@@ -5,6 +5,7 @@ import Section from "@/components/Section";
 import DataCard, { th, td, EmptyRow } from "@/components/DataCard";
 import ListingOrderButtons from "@/components/ListingOrderButtons";
 import ExportCsvButton from "@/components/ExportCsvButton";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,8 +44,11 @@ export default async function Page() {
             BeautyFort — buy candidates cleared to sell on Amazon right now, live from the automation pipeline
           </p>
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)" }} className="tabular">
-          Updated {relativeTime(data.generated_at)}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)" }} className="tabular">
+            Updated {relativeTime(data.generated_at)}
+          </div>
+          <AutoRefresh />
         </div>
       </header>
 
