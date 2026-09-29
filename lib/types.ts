@@ -94,6 +94,8 @@ export interface DailySummary {
 }
 
 export interface BuyCandidate {
+  opportunity_id: number;
+  amazon_product_id: number;
   asin: string;
   product_id: number;
   score: number;
@@ -103,6 +105,8 @@ export interface BuyCandidate {
   capital_required: number;
   listable: string | boolean;
   risks: string[];
+  product_title: string | null;
+  brand: string | null;
   supplier_sku: string | null;
   unit_cost_ex_vat: number | null;
   unit_cost_inc_vat: number | null;
@@ -116,6 +120,9 @@ export interface BuyCandidate {
   digital_services_fee: number | null;
   total_amazon_fees: number | null;
   break_even_price: number | null;
+  listing_id: number | null;
+  listing_status: string | null;
+  listing_issues: unknown[] | null;
 }
 
 export interface PoPipelineRow {

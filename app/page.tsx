@@ -5,6 +5,7 @@ import StatTile from "@/components/StatTile";
 import Section from "@/components/Section";
 import DataCard, { th, td, EmptyRow } from "@/components/DataCard";
 import ApprovalButtons from "@/components/ApprovalButtons";
+import ListingOrderButtons from "@/components/ListingOrderButtons";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,6 +30,7 @@ export default async function Page() {
   const ds = data.daily_summary;
   const cap = ds?.capital_position;
   const priorityIsRisk = ds?.priority_basis === "risk";
+  const readyToList = data.buy_candidates.filter((c) => truthy(c.listable));
 
   return (
     <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px 64px" }}>
@@ -146,9 +148,75 @@ export default async function Page() {
         ) : null}
       </div>
 
-      {/* Buy candidates table */}
+      {/* Ready to List */}
       <Section
-        title="Buy candidates"
+        title="Ready to List"
+        sub="Buy candidates cleared to sell — create the Amazon offer via SP-API, then place a test-mode BeautyFort order once it's live. Product type and attributes are looked up live from Amazon's own Catalog API for the ASIN."
+      >
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>ASIN</th>
+                  <th style={th}>Product</th>
+                  <th style={th}>Score</th>
+                  <th style={th}>Selling price</th>
+                  <th style={th}>Contribution</th>
+                  <th style={th}>Qty to order</th>
+                  <th style={th}>Listing / Order</th>
+                </tr>
+              </thead>
+              <tbody>
+                {readyToList.length === 0 ? (
+                  <EmptyRow colSpan={7} label="No listable buy candidates right now." />
+                ) : (
+                  readyToList.map((c) => (
+                    <tr key={c.asin}>
+                      <td style={td}>
+                        <a href={`https://www.amazon.co.uk/dp/${c.asin}`} target="_blank" rel="noreferrer">
+                          {c.asin}
+                        </a>
+                      </td>
+                      <td style={td}>
+                        {c.product_title ?? "—"}
+                        {c.brand ? <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.brand}</div> : null}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(c.score)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {gbp(c.selling_price)}
+                      </td>
+                      <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                        {gbp(c.contribution)}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {num(c.quantity_to_order)}
+                        {c.supplier_stock != null ? (
+                          <span style={{ color: "var(--text-muted)" }}> / {num(c.supplier_stock)} in stock</span>
+                        ) : null}
+                      </td>
+                      <td style={td}>
+                        <ListingOrderButtons
+                          opportunityId={c.opportunity_id}
+                          initialListingStatus={c.listing_status}
+                          initialListingIssues={c.listing_issues}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      {/* Buy candidates table (full detail) */}
+      <Section
+        collapsible
+        title="All buy candidates (full detail)"
         sub={`Top ${Math.min(
           data.buy_candidates.length,
           30
@@ -260,7 +328,7 @@ export default async function Page() {
       </Section>
 
       {/* Suppliers */}
-      <Section title="Suppliers" sub="Connected supplier connectors, sync status and catalogue coverage">
+      <Section collapsible title="Suppliers" sub="Connected supplier connectors, sync status and catalogue coverage">
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
           <StatTile label="Connected suppliers" value={num(data.suppliers.length)} />
           <StatTile
@@ -468,7 +536,7 @@ export default async function Page() {
       </Section>
 
       {/* Inventory */}
-      <Section title="Inventory" sub="Live FBA stock levels and replenishment recommendations">
+      <Section collapsible title="Inventory" sub="Live FBA stock levels and replenishment recommendations">
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
           <StatTile label="SKUs tracked" value={num(data.inventory_summary.total_skus)} />
           <StatTile
@@ -706,6 +774,7 @@ export default async function Page() {
 
       {/* Workflow health */}
       <Section
+        collapsible
         title="Workflow health"
         sub="Every failure across the 39-workflow pipeline reports here via Central Error Logger — a clean run shows nothing"
       >
