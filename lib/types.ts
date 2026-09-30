@@ -210,6 +210,17 @@ export interface BuyPlanSummary {
   total_scored: number;
 }
 
+// One approval you could get, and the profitable products it would open up (07 blockers[]).
+export interface UnlockAction {
+  blocker: "brand_approval" | "hazmat" | string;
+  brand: string | null;
+  products: number;
+  monthly_profit: number | null;
+  unlocked_alone: number;
+  monthly_profit_alone: number | null;
+  stock_cash_inc_vat: number | null;
+}
+
 export interface WatchRow {
   asin: string;
   product_title: string | null;
@@ -370,6 +381,7 @@ export interface DashboardPayload {
   buy_plan?: BuyPlanRow[];
   buy_plan_summary?: BuyPlanSummary | null;
   watch_list?: WatchRow[];
+  unlock_actions?: UnlockAction[];
   opportunity_counts: { buy_candidate: number; review: number; reject: number; top_score: number | null };
   eligible_skus: EligibleSku[];
   eligible_skus_summary: EligibleSkusSummary;

@@ -8,7 +8,7 @@ import ExportCsvButton from "@/components/ExportCsvButton";
 import { toCsvTable, type CsvColumn } from "@/lib/csv";
 import AutoRefresh from "@/components/AutoRefresh";
 import Badge from "@/components/Badge";
-import type { BuyPlanRow, EligibleSku, WatchRow } from "@/lib/types";
+import type { BuyPlanRow, EligibleSku, UnlockAction, WatchRow } from "@/lib/types";
 
 // Supplier order sheet: exactly what to put on the BeautyFort PO.
 const BUY_PLAN_COLUMNS: CsvColumn<BuyPlanRow>[] = [
@@ -56,6 +56,28 @@ const WATCH_COLUMNS: CsvColumn<WatchRow>[] = [
   { label: "What's blocking it", get: (r) => r.reason },
   { label: "Eligibility", get: (r) => r.eligibility },
 ];
+
+const UNLOCK_COLUMNS: CsvColumn<UnlockAction>[] = [
+  { label: "Action", get: (u) => unlockTitle(u) },
+  { label: "Profitable products it opens up", get: (u) => u.products },
+  { label: "Expected profit per month (GBP)", get: (u) => u.monthly_profit },
+  { label: "Products this alone unlocks", get: (u) => u.unlocked_alone },
+  { label: "Profit per month this alone unlocks (GBP)", get: (u) => u.monthly_profit_alone },
+  { label: "Stock to buy inc VAT (GBP)", get: (u) => u.stock_cash_inc_vat },
+];
+
+/** Plain-English action for an approval blocker. */
+function unlockTitle(u: UnlockAction): string {
+  if (u.blocker === "hazmat") return "Get dangerous-goods (hazmat) approval";
+  if (u.blocker === "brand_approval") return `Apply for ${u.brand ?? "brand"} approval`;
+  return u.blocker.replace(/_/g, " ");
+}
+
+function unlockHow(u: UnlockAction): string {
+  if (u.blocker === "hazmat")
+    return "Get the safety data sheets (SDS) from BeautyFort and submit them in Seller Central for these fragrances/aerosols.";
+  return "Seller Central → Add a Product → search one of the ASINs → Apply to sell (usually needs an invoice from an authorised distributor).";
+}
 
 const ELIGIBLE_SKU_COLUMNS: CsvColumn<EligibleSku>[] = [
   { label: "ASIN", get: (r) => r.asin },
@@ -224,6 +246,8 @@ export default async function Page() {
 
   const plan = data.buy_plan ?? [];
   const watch = data.watch_list ?? [];
+  const unlocks = data.unlock_actions ?? [];
+  const unlockProfit = unlocks.reduce((sum, u) => sum + (u.monthly_profit_alone ?? 0), 0);
   const s = data.buy_plan_summary;
   const budget = s?.budget_inc_vat ?? null;
   const spend = s?.planned_cash_inc_vat ?? 0;
@@ -308,7 +332,7 @@ export default async function Page() {
                 {plan.length === 0 ? (
                   <EmptyRow
                     colSpan={11}
-                    label="Nothing clears every check right now — see “Unlock more profit” below for what's closest."
+                    label="Nothing clears every check right now — the approvals below are what would change that."
                   />
                 ) : (
                   plan.map((r) => {
@@ -394,9 +418,62 @@ export default async function Page() {
 
       <Section
         title="Unlock more profit"
-        sub={`Products that would earn money but are held back by one thing — ranked by expected profit per month${
+        sub={`Approvals that open up products which already clear every profit check — ranked by the profit they'd add each month.${
+          unlockProfit > 0 ? ` Doing all of these unlocks at least ${gbp(unlockProfit)}/month on their own.` : ""
+        } Numbers grow as more of the catalogue gets priced.`}
+        right={<ExportCsvButton {...toCsvTable(unlocks, UNLOCK_COLUMNS)} filenamePrefix="unlock-actions" />}
+      >
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>Action</th>
+                  <th style={th}>Profit / month</th>
+                  <th style={th}>Products</th>
+                  <th style={th}>Stock to buy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unlocks.length === 0 ? (
+                  <EmptyRow colSpan={4} label="No approval-blocked products with sales data yet — this fills in as prices refresh." />
+                ) : (
+                  unlocks.map((u) => (
+                    <tr key={`${u.blocker}-${u.brand ?? ""}`}>
+                      <td style={{ ...td, maxWidth: 460 }}>
+                        <span style={{ fontWeight: 600 }}>{unlockTitle(u)}</span>
+                        <div style={muted}>{unlockHow(u)}</div>
+                      </td>
+                      <td style={{ ...td, fontWeight: 600, color: "var(--status-good)" }} className="tabular">
+                        {gbp(u.monthly_profit)}
+                        {u.unlocked_alone < u.products ? (
+                          <div style={{ ...muted, fontWeight: 400 }}>{gbp(u.monthly_profit_alone)} on its own</div>
+                        ) : null}
+                      </td>
+                      <td style={td} className="tabular">
+                        {num(u.products)}
+                        {u.unlocked_alone < u.products ? (
+                          <div style={muted}>{num(u.products - u.unlocked_alone)} also need another approval</div>
+                        ) : null}
+                      </td>
+                      <td style={td} className="tabular">
+                        {gbp(u.stock_cash_inc_vat)}
+                        <div style={muted}>inc VAT, first 30 days</div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      <Section
+        title="Close to profitable"
+        sub={`Individual products held back by one thing — ranked by expected profit per month${
           watch.length ? ` (${gbp(watchProfit)}/month across these ${num(watch.length)})` : ""
-        }. Most often that's brand or category approval on Seller Central.`}
+        }.`}
         right={<ExportCsvButton {...toCsvTable(watch, WATCH_COLUMNS)} filenamePrefix="watch-list" />}
       >
         <DataCard>

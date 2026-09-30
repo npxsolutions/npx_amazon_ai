@@ -40,6 +40,7 @@ const TONE_MAP: Record<string, Tone> = {
   no_sales_data: "neutral",
   no_recent_sales: "critical",
   slow_seller: "warning",
+  hazmat: "serious",
   // buying verdict (product_opportunities.data.verdict)
   BUY: "good",
   WATCH: "warning",
