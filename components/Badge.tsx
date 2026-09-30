@@ -26,6 +26,19 @@ const TONE_MAP: Record<string, Tone> = {
   WARNING: "warning",
   CHECKED: "neutral",
   NONE: "good",
+  // risk flags (product_opportunities.risks)
+  amazon_on_listing: "serious",
+  high_competition: "serious",
+  low_margin: "warning",
+  low_roi: "warning",
+  negative_contribution: "critical",
+  calc_error: "critical",
+  gated_restricted: "critical",
+  approval_required: "warning",
+  eligibility_unknown: "neutral",
+  // eligible-SKU scoring-pipeline status (not an opportunity status yet)
+  awaiting_price_data: "neutral",
+  queued_for_scoring: "neutral",
 };
 
 export function toneFor(label: string): Tone {

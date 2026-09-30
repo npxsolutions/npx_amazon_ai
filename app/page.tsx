@@ -22,6 +22,9 @@ const BUY_LIST_COLUMNS: CsvColumn<BuyCandidate>[] = [
   { label: "Qty to order", get: (c) => c.quantity_to_order },
   { label: "Capital required (GBP)", get: (c) => c.capital_required },
   { label: "Break-even price (GBP)", get: (c) => c.break_even_price },
+  { label: "Sellers on listing", get: (c) => c.seller_count },
+  { label: "Amazon on listing", get: (c) => (c.amazon_present ? "yes" : "no") },
+  { label: "Risks", get: (c) => (c.risks && c.risks.length ? c.risks.join("; ") : "none") },
   { label: "Supplier SKU", get: (c) => c.supplier_sku },
   { label: "Supplier stock", get: (c) => c.supplier_stock },
   { label: "Listing status", get: (c) => c.listing_status ?? "not listed" },
@@ -38,9 +41,54 @@ const ELIGIBLE_SKU_COLUMNS: CsvColumn<EligibleSku>[] = [
   { label: "ROI", get: (r) => (r.roi != null ? (r.roi * 100).toFixed(1) + "%" : null) },
   { label: "Contribution per unit (GBP)", get: (r) => r.contribution },
   { label: "Capital required (GBP)", get: (r) => r.capital_required },
-  { label: "Opportunity status", get: (r) => r.opportunity_status ?? "not yet scored" },
+  { label: "Sellers on listing", get: (r) => r.seller_count },
+  { label: "Amazon on listing", get: (r) => (r.amazon_present ? "yes" : r.amazon_present === false ? "no" : null) },
+  { label: "Last priced", get: (r) => r.last_priced_at },
+  { label: "Risks", get: (r) => (r.risks && r.risks.length ? r.risks.join("; ") : r.opportunity_status ? "none" : null) },
+  { label: "Opportunity status", get: (r) => r.opportunity_status ?? (r.last_priced_at ? "queued for scoring" : "awaiting price data") },
   { label: "Listing status", get: (r) => r.listing_status ?? "not listed" },
 ];
+
+/** Small inline row of risk-flag badges, or a reassuring "Clean" tag when there are none. */
+function RiskChips({ risks }: { risks: string[] | null | undefined }) {
+  if (!risks || risks.length === 0) {
+    return <Badge label="clean" tone="good" />;
+  }
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {risks.map((r) => (
+        <Badge key={r} label={r} />
+      ))}
+    </div>
+  );
+}
+
+/** Competition signal: seller count plus a flag when Amazon itself is on the listing. */
+function CompetitionCell({
+  sellerCount,
+  amazonPresent,
+}: {
+  sellerCount: number | null | undefined;
+  amazonPresent: boolean | null | undefined;
+}) {
+  if (sellerCount == null && amazonPresent == null) {
+    return <span style={{ color: "var(--text-muted)" }}>no price data</span>;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span className="tabular">{sellerCount != null ? `${num(sellerCount)} sellers` : "—"}</span>
+      {amazonPresent ? (
+        <span style={{ fontSize: 11, color: "var(--status-serious)", fontWeight: 600 }}>Amazon on listing</span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Resolves the eligible-SKU status badge: real opportunity status once scored, otherwise where it sits in the pricing/scoring queue. */
+function eligibleStatusLabel(r: EligibleSku): string {
+  if (r.opportunity_status) return r.opportunity_status;
+  return r.last_priced_at ? "queued_for_scoring" : "awaiting_price_data";
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -114,12 +162,14 @@ export default async function Page() {
                   <th style={th}>Contribution</th>
                   <th style={th}>Qty to order</th>
                   <th style={th}>Capital required</th>
+                  <th style={th}>Competition</th>
+                  <th style={th}>Risks</th>
                   <th style={th}>Listing / Order</th>
                 </tr>
               </thead>
               <tbody>
                 {buyList.length === 0 ? (
-                  <EmptyRow colSpan={10} label="No listable buy candidates right now." />
+                  <EmptyRow colSpan={12} label="No listable buy candidates right now." />
                 ) : (
                   buyList.map((c) => (
                     <tr key={c.asin}>
@@ -157,6 +207,12 @@ export default async function Page() {
                         {gbp(c.capital_required)}
                       </td>
                       <td style={td}>
+                        <CompetitionCell sellerCount={c.seller_count} amazonPresent={c.amazon_present} />
+                      </td>
+                      <td style={td}>
+                        <RiskChips risks={c.risks} />
+                      </td>
+                      <td style={td}>
                         <ListingOrderButtons
                           opportunityId={c.opportunity_id}
                           initialListingStatus={c.listing_status}
@@ -192,18 +248,19 @@ export default async function Page() {
                 <tr>
                   <th style={th}>ASIN</th>
                   <th style={th}>Product</th>
-                  <th style={th}>Supplier SKU</th>
+                  <th style={th}>Status</th>
                   <th style={th}>Score</th>
                   <th style={th}>Margin</th>
                   <th style={th}>ROI</th>
                   <th style={th}>Contribution</th>
+                  <th style={th}>Competition</th>
+                  <th style={th}>Risks</th>
                   <th style={th}>Stock</th>
-                  <th style={th}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {eligibleTop50.length === 0 ? (
-                  <EmptyRow colSpan={9} label="No eligible SKUs yet." />
+                  <EmptyRow colSpan={10} label="No eligible SKUs yet." />
                 ) : (
                   eligibleTop50.map((r) => (
                     <tr key={r.asin}>
@@ -214,11 +271,15 @@ export default async function Page() {
                       </td>
                       <td style={td}>
                         {r.product_title ?? "—"}
-                        {r.brand ? <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.brand}</div> : null}
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          {[r.brand, r.supplier_sku].filter(Boolean).join(" · ") || null}
+                        </div>
                       </td>
-                      <td style={td}>{r.supplier_sku ?? "—"}</td>
+                      <td style={td}>
+                        <Badge label={eligibleStatusLabel(r)} />
+                      </td>
                       <td style={{ ...td }} className="tabular">
-                        {r.score != null ? num(r.score) : <span style={{ color: "var(--text-muted)" }}>not scored</span>}
+                        {r.score != null ? num(r.score) : <span style={{ color: "var(--text-muted)" }}>—</span>}
                       </td>
                       <td style={{ ...td }} className="tabular">
                         {pct(r.margin)}
@@ -229,11 +290,18 @@ export default async function Page() {
                       <td style={{ ...td, fontWeight: 600 }} className="tabular">
                         {gbp(r.contribution)}
                       </td>
-                      <td style={{ ...td }} className="tabular">
-                        {r.supplier_stock != null ? num(r.supplier_stock) : "—"}
+                      <td style={td}>
+                        <CompetitionCell sellerCount={r.seller_count} amazonPresent={r.amazon_present} />
                       </td>
                       <td style={td}>
-                        <Badge label={r.opportunity_status ?? (r.listing_status ?? "not scored")} />
+                        {r.opportunity_status ? (
+                          <RiskChips risks={r.risks} />
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>not scored yet</span>
+                        )}
+                      </td>
+                      <td style={{ ...td }} className="tabular">
+                        {r.supplier_stock != null ? num(r.supplier_stock) : "—"}
                       </td>
                     </tr>
                   ))

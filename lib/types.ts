@@ -123,6 +123,9 @@ export interface BuyCandidate {
   listing_id: number | null;
   listing_status: string | null;
   listing_issues: unknown[] | null;
+  seller_count: number | null;
+  amazon_present: boolean | null;
+  last_priced_at: string | null;
 }
 
 export interface EligibleSku {
@@ -137,8 +140,13 @@ export interface EligibleSku {
   contribution: number | null;
   capital_required: number | null;
   opportunity_status: string | null;
+  risks: string[] | null;
   listing_status: string | null;
   eligibility_checked_at: string;
+  seller_count: number | null;
+  amazon_present: boolean | null;
+  buy_box_price: number | null;
+  last_priced_at: string | null;
 }
 
 export interface EligibleSkusSummary {
