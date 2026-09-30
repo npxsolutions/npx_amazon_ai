@@ -22,13 +22,26 @@ const BUY_PLAN_COLUMNS: CsvColumn<BuyPlanRow>[] = [
   { label: "Unit cost inc VAT (GBP)", get: (r) => r.unit_cost_inc_vat },
   { label: "Line cost ex VAT (GBP)", get: (r) => (r.unit_cost_ex_vat != null ? +(r.unit_cost_ex_vat * r.order_qty).toFixed(2) : null) },
   { label: "Line cost inc VAT (GBP)", get: (r) => r.order_cash_inc_vat },
-  { label: "Selling price (GBP)", get: (r) => r.selling_price },
+  { label: "Selling price used (GBP)", get: (r) => r.selling_price },
+  { label: "Price basis", get: (r) => priceBasisLabel(r.price_basis) },
+  { label: "Live Buy Box (GBP)", get: (r) => r.live_buy_box },
+  { label: "90-day avg Buy Box (GBP)", get: (r) => r.avg90_buy_box },
+  { label: "VAT on sale (GBP)", get: (r) => vatOnSale(r) },
+  { label: "Net of VAT (GBP)", get: (r) => r.net_revenue },
+  { label: "Referral fee (GBP)", get: (r) => r.amazon_referral_fee },
+  { label: "Referral rate", get: (r) => (r.referral_rate != null ? (r.referral_rate * 100).toFixed(1) + "%" : null) },
+  { label: "FBA fee (GBP)", get: (r) => r.fba_fulfilment_fee },
+  { label: "Digital services fee (GBP)", get: (r) => r.digital_services_fee },
+  { label: "Total Amazon fees (GBP)", get: (r) => totalFees(r) },
   { label: "Profit per unit (GBP)", get: (r) => r.profit_per_unit },
+  { label: "Margin", get: (r) => (r.margin != null ? (r.margin * 100).toFixed(1) + "%" : null) },
+  { label: "ROI", get: (r) => (r.roi != null ? (r.roi * 100).toFixed(1) + "%" : null) },
   { label: "Expected sales per month (you)", get: (r) => r.est_units_month },
   { label: "Expected profit per month (GBP)", get: (r) => r.monthly_profit },
-  { label: "Referral fee (GBP)", get: (r) => r.amazon_referral_fee },
-  { label: "FBA fee (GBP)", get: (r) => r.fba_fulfilment_fee },
   { label: "Break-even price (GBP)", get: (r) => r.break_even_price },
+  { label: "Max buy price ex VAT (GBP)", get: (r) => r.max_purchase_cost },
+  { label: "Fees source", get: (r) => (r.fba_fee_source === "keepa_pick_and_pack" ? "Amazon (via Keepa)" : "estimated") },
+  { label: "Last priced", get: (r) => r.last_priced_at },
   { label: "Sellers on listing", get: (r) => r.seller_count },
   { label: "Supplier stock", get: (r) => r.supplier_stock },
 ];
@@ -111,6 +124,82 @@ function qtyNote(r: BuyPlanRow): string | null {
   return null;
 }
 
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** Output VAT Amazon collects on each sale: selling price less the net-of-VAT revenue scoring used. */
+function vatOnSale(r: BuyPlanRow): number | null {
+  return r.selling_price != null && r.net_revenue != null ? round2(r.selling_price - r.net_revenue) : null;
+}
+
+function totalFees(r: BuyPlanRow): number | null {
+  if (r.amazon_referral_fee == null && r.fba_fulfilment_fee == null) return null;
+  return round2((r.amazon_referral_fee ?? 0) + (r.fba_fulfilment_fee ?? 0) + (r.digital_services_fee ?? 0));
+}
+
+function priceBasisLabel(basis: string | null): string {
+  switch (basis) {
+    case "live_buy_box":
+      return "live Buy Box";
+    case "avg90_buy_box":
+      return "90-day average (live price is above it)";
+    case "avg30_buy_box_no_live":
+      return "30-day average (no live Buy Box)";
+    case "avg90_buy_box_no_live":
+      return "90-day average (no live Buy Box)";
+    default:
+      return "unknown";
+  }
+}
+
+/** Per-unit waterfall from selling price to profit, plus the price and fee evidence behind it. */
+function Breakdown({ r }: { r: BuyPlanRow }) {
+  const line = (label: string, value: string, opts: { minus?: boolean; strong?: boolean; note?: string } = {}) => (
+    <tr>
+      <td style={{ padding: "3px 12px 3px 0", color: opts.strong ? "var(--text-primary)" : "var(--text-secondary)", fontWeight: opts.strong ? 600 : 400 }}>
+        {opts.minus ? "− " : ""}
+        {label}
+        {opts.note ? <span style={{ ...muted, marginLeft: 6 }}>{opts.note}</span> : null}
+      </td>
+      <td className="tabular" style={{ padding: "3px 0", textAlign: "right", fontWeight: opts.strong ? 600 : 400 }}>
+        {value}
+      </td>
+    </tr>
+  );
+  const keepaFees = r.fba_fee_source === "keepa_pick_and_pack";
+  return (
+    <div style={{ display: "flex", gap: 32, flexWrap: "wrap", fontSize: 12.5 }}>
+      <table style={{ minWidth: 260 }}>
+        <tbody>
+          {line("Selling price", gbp(r.selling_price), { strong: true, note: priceBasisLabel(r.price_basis) })}
+          {line("VAT on sale", gbp(vatOnSale(r)), { minus: true })}
+          {line(
+            "Referral fee",
+            gbp(r.amazon_referral_fee),
+            { minus: true, note: r.referral_rate != null ? `${(r.referral_rate * 100).toFixed(1)}%` : undefined }
+          )}
+          {line("FBA fee", gbp(r.fba_fulfilment_fee), { minus: true, note: keepaFees ? "Amazon's fee for this item" : "estimate" })}
+          {line("Digital services fee", gbp(r.digital_services_fee), { minus: true })}
+          {line("Your cost ex VAT", gbp(r.effective_unit_cost ?? r.unit_cost_ex_vat), { minus: true, note: "VAT reclaimed" })}
+          {line("Profit per unit", gbp(r.profit_per_unit), { strong: true, note: `${pct(r.margin, 1)} margin · ${pct(r.roi)} ROI` })}
+        </tbody>
+      </table>
+      <table style={{ minWidth: 240 }}>
+        <tbody>
+          {line("Live Buy Box", gbp(r.live_buy_box))}
+          {line("30-day average", gbp(r.avg30_buy_box))}
+          {line("90-day average", gbp(r.avg90_buy_box))}
+          {line("Break-even price", gbp(r.break_even_price), { note: "sell below this and you lose money" })}
+          {line("Max you should pay", gbp(r.max_purchase_cost), { note: "ex VAT, per unit" })}
+          {line("Cash per unit", gbp(r.unit_cost_inc_vat), { note: "inc VAT" })}
+          {line("Last priced", relativeTime(r.last_priced_at))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const muted: React.CSSProperties = { fontSize: 11.5, color: "var(--text-muted)" };
 
 export const dynamic = "force-dynamic";
@@ -145,7 +234,7 @@ export default async function Page() {
   const eligibleTop50 = data.eligible_skus.slice(0, 50);
 
   return (
-    <main style={{ maxWidth: 1080, margin: "0 auto", padding: "28px 20px 64px" }}>
+    <main style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 20px 64px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>What to buy</h1>
@@ -204,9 +293,12 @@ export default async function Page() {
                 <tr>
                   <th style={th}>#</th>
                   <th style={th}>Product</th>
+                  <th style={th}>Sells at</th>
+                  <th style={th}>Amazon fees</th>
+                  <th style={th}>Your cost</th>
+                  <th style={th}>Profit / unit</th>
                   <th style={th}>Order</th>
                   <th style={th}>Cost inc VAT</th>
-                  <th style={th}>Profit / unit</th>
                   <th style={th}>Sells / month</th>
                   <th style={th}>Profit / month</th>
                   <th style={th}>Listing / Order</th>
@@ -215,7 +307,7 @@ export default async function Page() {
               <tbody>
                 {plan.length === 0 ? (
                   <EmptyRow
-                    colSpan={8}
+                    colSpan={11}
                     label="Nothing clears every check right now — see “Unlock more profit” below for what's closest."
                   />
                 ) : (
@@ -236,8 +328,36 @@ export default async function Page() {
                             </a>
                           </div>
                           <div style={{ ...muted, marginTop: 2 }}>
-                            Sells at {gbp(r.selling_price)} · fees {gbp(r.amazon_referral_fee)} referral +{" "}
-                            {gbp(r.fba_fulfilment_fee)} FBA · {r.seller_count != null ? `${num(r.seller_count)} sellers` : "sellers unknown"}
+                            {r.seller_count != null ? `${num(r.seller_count)} sellers` : "sellers unknown"}
+                            {r.amazon_present ? " · Amazon on listing" : ""}
+                          </div>
+                          <details style={{ marginTop: 6 }}>
+                            <summary style={{ ...muted, cursor: "pointer", color: "var(--text-secondary)" }}>
+                              Price &amp; fees
+                            </summary>
+                            <div style={{ marginTop: 8 }}>
+                              <Breakdown r={r} />
+                            </div>
+                          </details>
+                        </td>
+                        <td style={td} className="tabular">
+                          {gbp(r.selling_price)}
+                          <div style={muted}>{r.price_basis === "live_buy_box" ? "live price" : "90-day avg"}</div>
+                        </td>
+                        <td style={td} className="tabular">
+                          {gbp(totalFees(r))}
+                          <div style={muted}>
+                            {gbp(r.amazon_referral_fee)} + {gbp(r.fba_fulfilment_fee)} FBA
+                          </div>
+                        </td>
+                        <td style={td} className="tabular">
+                          {gbp(r.unit_cost_ex_vat)}
+                          <div style={muted}>ex VAT</div>
+                        </td>
+                        <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                          {gbp(r.profit_per_unit)}
+                          <div style={{ ...muted, fontWeight: 400 }}>
+                            {pct(r.margin)} margin · {pct(r.roi)} ROI
                           </div>
                         </td>
                         <td style={{ ...td, fontWeight: 600 }} className="tabular">
@@ -247,10 +367,6 @@ export default async function Page() {
                         <td style={td} className="tabular">
                           {gbp(r.order_cash_inc_vat)}
                           <div style={muted}>{gbp(r.unit_cost_inc_vat)} each</div>
-                        </td>
-                        <td style={td} className="tabular">
-                          {gbp(r.profit_per_unit)}
-                          <div style={muted}>ROI {pct(r.roi)}</div>
                         </td>
                         <td style={td} className="tabular">
                           {num(r.est_units_month)}
