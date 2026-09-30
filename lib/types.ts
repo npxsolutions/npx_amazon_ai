@@ -149,6 +149,75 @@ export interface EligibleSku {
   last_priced_at: string | null;
 }
 
+// One line of the budget-constrained buy plan built by workflow 07 (Build Buy Plan).
+export interface BuyPlanRow {
+  opportunity_id: number;
+  asin: string;
+  product_id: number;
+  amazon_product_id: number;
+  product_title: string | null;
+  brand: string | null;
+  supplier_sku: string | null;
+  supplier_stock: number | null;
+  unit_cost_ex_vat: number | null;
+  unit_cost_inc_vat: number | null;
+  profit_per_unit: number | null;
+  margin: number | null;
+  roi: number | null;
+  plan_rank: number;
+  order_qty: number;
+  order_cash_inc_vat: number;
+  monthly_profit: number;
+  partial: boolean | null;
+  est_units_month: number | null;
+  market_units_month: number | null;
+  velocity_source: string | null;
+  reason: string | null;
+  selling_price: number | null;
+  price_basis: string | null;
+  amazon_referral_fee: number | null;
+  fba_fulfilment_fee: number | null;
+  digital_services_fee: number | null;
+  fba_fee_source: string | null;
+  break_even_price: number | null;
+  seller_count: number | null;
+  amazon_present: boolean | null;
+  risks: string[] | null;
+  listing_id: number | null;
+  listing_status: string | null;
+  last_priced_at: string | null;
+}
+
+export interface BuyPlanSummary {
+  budget_inc_vat: number | null;
+  planned_at: string | null;
+  planned_cash_inc_vat: number;
+  planned_monthly_profit: number;
+  planned_lines: number;
+  planned_units: number;
+  buy_count: number;
+  watch_count: number;
+  skip_count: number;
+  priced_last_24h: number;
+  total_scored: number;
+}
+
+export interface WatchRow {
+  asin: string;
+  product_title: string | null;
+  brand: string | null;
+  est_monthly_profit: number | null;
+  est_units_month: number | null;
+  profit_per_unit: number | null;
+  margin: number | null;
+  roi: number | null;
+  reason: string | null;
+  eligibility: string | null;
+  seller_count: number | null;
+  amazon_present: boolean | null;
+  risks: string[] | null;
+}
+
 export interface EligibleSkusSummary {
   total_eligible: number;
   scored: number;
@@ -290,6 +359,9 @@ export interface DashboardPayload {
   generated_at: string;
   daily_summary: DailySummary | null;
   buy_candidates: BuyCandidate[];
+  buy_plan?: BuyPlanRow[];
+  buy_plan_summary?: BuyPlanSummary | null;
+  watch_list?: WatchRow[];
   opportunity_counts: { buy_candidate: number; review: number; reject: number; top_score: number | null };
   eligible_skus: EligibleSku[];
   eligible_skus_summary: EligibleSkusSummary;

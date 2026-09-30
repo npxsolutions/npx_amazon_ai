@@ -36,6 +36,14 @@ const TONE_MAP: Record<string, Tone> = {
   gated_restricted: "critical",
   approval_required: "warning",
   eligibility_unknown: "neutral",
+  no_live_buy_box: "warning",
+  no_sales_data: "neutral",
+  no_recent_sales: "critical",
+  slow_seller: "warning",
+  // buying verdict (product_opportunities.data.verdict)
+  BUY: "good",
+  WATCH: "warning",
+  SKIP: "critical",
   // eligible-SKU scoring-pipeline status (not an opportunity status yet)
   awaiting_price_data: "neutral",
   queued_for_scoring: "neutral",

@@ -1,5 +1,5 @@
 import { fetchDashboard } from "@/lib/fetchDashboard";
-import { gbp, pct, num, relativeTime, truthy } from "@/lib/format";
+import { gbp, pct, num, relativeTime } from "@/lib/format";
 import StatTile from "@/components/StatTile";
 import Section from "@/components/Section";
 import DataCard, { th, td, EmptyRow } from "@/components/DataCard";
@@ -8,26 +8,40 @@ import ExportCsvButton from "@/components/ExportCsvButton";
 import { toCsvTable, type CsvColumn } from "@/lib/csv";
 import AutoRefresh from "@/components/AutoRefresh";
 import Badge from "@/components/Badge";
-import type { BuyCandidate, EligibleSku } from "@/lib/types";
+import type { BuyPlanRow, EligibleSku, WatchRow } from "@/lib/types";
 
-const BUY_LIST_COLUMNS: CsvColumn<BuyCandidate>[] = [
-  { label: "ASIN", get: (c) => c.asin },
-  { label: "Product", get: (c) => c.product_title },
-  { label: "Brand", get: (c) => c.brand },
-  { label: "Score", get: (c) => c.score },
-  { label: "Selling price (GBP)", get: (c) => c.selling_price },
-  { label: "Margin", get: (c) => (c.margin != null ? (c.margin * 100).toFixed(1) + "%" : null) },
-  { label: "ROI", get: (c) => (c.roi != null ? (c.roi * 100).toFixed(1) + "%" : null) },
-  { label: "Contribution per unit (GBP)", get: (c) => c.contribution },
-  { label: "Qty to order", get: (c) => c.quantity_to_order },
-  { label: "Capital required (GBP)", get: (c) => c.capital_required },
-  { label: "Break-even price (GBP)", get: (c) => c.break_even_price },
-  { label: "Sellers on listing", get: (c) => c.seller_count },
-  { label: "Amazon on listing", get: (c) => (c.amazon_present ? "yes" : "no") },
-  { label: "Risks", get: (c) => (c.risks && c.risks.length ? c.risks.join("; ") : "none") },
-  { label: "Supplier SKU", get: (c) => c.supplier_sku },
-  { label: "Supplier stock", get: (c) => c.supplier_stock },
-  { label: "Listing status", get: (c) => c.listing_status ?? "not listed" },
+// Supplier order sheet: exactly what to put on the BeautyFort PO.
+const BUY_PLAN_COLUMNS: CsvColumn<BuyPlanRow>[] = [
+  { label: "Rank", get: (r) => r.plan_rank },
+  { label: "Supplier SKU", get: (r) => r.supplier_sku },
+  { label: "ASIN", get: (r) => r.asin },
+  { label: "Product", get: (r) => r.product_title },
+  { label: "Brand", get: (r) => r.brand },
+  { label: "Order qty", get: (r) => r.order_qty },
+  { label: "Unit cost ex VAT (GBP)", get: (r) => r.unit_cost_ex_vat },
+  { label: "Unit cost inc VAT (GBP)", get: (r) => r.unit_cost_inc_vat },
+  { label: "Line cost ex VAT (GBP)", get: (r) => (r.unit_cost_ex_vat != null ? +(r.unit_cost_ex_vat * r.order_qty).toFixed(2) : null) },
+  { label: "Line cost inc VAT (GBP)", get: (r) => r.order_cash_inc_vat },
+  { label: "Selling price (GBP)", get: (r) => r.selling_price },
+  { label: "Profit per unit (GBP)", get: (r) => r.profit_per_unit },
+  { label: "Expected sales per month (you)", get: (r) => r.est_units_month },
+  { label: "Expected profit per month (GBP)", get: (r) => r.monthly_profit },
+  { label: "Referral fee (GBP)", get: (r) => r.amazon_referral_fee },
+  { label: "FBA fee (GBP)", get: (r) => r.fba_fulfilment_fee },
+  { label: "Break-even price (GBP)", get: (r) => r.break_even_price },
+  { label: "Sellers on listing", get: (r) => r.seller_count },
+  { label: "Supplier stock", get: (r) => r.supplier_stock },
+];
+
+const WATCH_COLUMNS: CsvColumn<WatchRow>[] = [
+  { label: "ASIN", get: (r) => r.asin },
+  { label: "Product", get: (r) => r.product_title },
+  { label: "Brand", get: (r) => r.brand },
+  { label: "Expected profit per month (GBP)", get: (r) => r.est_monthly_profit },
+  { label: "Expected sales per month (you)", get: (r) => r.est_units_month },
+  { label: "Profit per unit (GBP)", get: (r) => r.profit_per_unit },
+  { label: "What's blocking it", get: (r) => r.reason },
+  { label: "Eligibility", get: (r) => r.eligibility },
 ];
 
 const ELIGIBLE_SKU_COLUMNS: CsvColumn<EligibleSku>[] = [
@@ -90,6 +104,15 @@ function eligibleStatusLabel(r: EligibleSku): string {
   return r.last_priced_at ? "queued_for_scoring" : "awaiting_price_data";
 }
 
+/** Why the order quantity is what it is: 30 days of expected sales, unless the supplier or the budget capped it. */
+function qtyNote(r: BuyPlanRow): string | null {
+  if (r.partial) return "cut to fit budget";
+  if (r.supplier_stock != null && r.order_qty >= r.supplier_stock) return "all supplier stock";
+  return null;
+}
+
+const muted: React.CSSProperties = { fontSize: 11.5, color: "var(--text-muted)" };
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -110,22 +133,25 @@ export default async function Page() {
     );
   }
 
-  const buyList = data.buy_candidates.filter((c) => truthy(c.listable));
-  const totalContribution = buyList.reduce(
-    (sum, c) => sum + (c.contribution ?? 0) * (c.quantity_to_order ?? 0),
-    0
-  );
-  const totalCapital = buyList.reduce((sum, c) => sum + (c.capital_required ?? 0), 0);
-  const liveCount = buyList.filter((c) => c.listing_status === "live" || c.listing_status === "already_live").length;
+  const plan = data.buy_plan ?? [];
+  const watch = data.watch_list ?? [];
+  const s = data.buy_plan_summary;
+  const budget = s?.budget_inc_vat ?? null;
+  const spend = s?.planned_cash_inc_vat ?? 0;
+  const monthlyProfit = s?.planned_monthly_profit ?? 0;
+  const monthlyReturn = spend > 0 ? monthlyProfit / spend : null;
+  const unspent = budget != null ? Math.max(0, budget - spend) : null;
+  const watchProfit = watch.reduce((sum, w) => sum + (w.est_monthly_profit ?? 0), 0);
   const eligibleTop50 = data.eligible_skus.slice(0, 50);
 
   return (
     <main style={{ maxWidth: 1080, margin: "0 auto", padding: "28px 20px 64px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Buy List</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>What to buy</h1>
           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "2px 0 0" }}>
-            BeautyFort — buy candidates cleared to sell on Amazon right now, live from the automation pipeline
+            BeautyFort — the products that make the most profit per month for your budget, live from the automation
+            pipeline
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -137,87 +163,164 @@ export default async function Page() {
       </header>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 20 }}>
-        <StatTile label="Listable now" value={num(buyList.length)} tone="good" />
-        <StatTile label="Listings live" value={num(liveCount)} sub={`of ${num(buyList.length)} listable`} />
-        <StatTile label="Potential contribution" value={gbp(totalContribution)} sub="if fully ordered" />
-        <StatTile label="Capital required" value={gbp(totalCapital)} sub="to order the full list" />
+        <StatTile
+          label="Spend"
+          value={gbp(spend)}
+          sub={budget != null ? `of ${gbp(budget)} budget inc VAT` : "inc VAT"}
+        />
+        <StatTile label="Profit per month" value={gbp(monthlyProfit)} tone="good" sub="expected, after all Amazon fees" />
+        <StatTile
+          label="Monthly return"
+          value={monthlyReturn != null ? pct(monthlyReturn) : "—"}
+          sub="profit per month ÷ cash spent"
+        />
+        <StatTile
+          label="Products"
+          value={num(s?.planned_lines ?? 0)}
+          sub={`${num(s?.planned_units ?? 0)} units to order`}
+        />
       </div>
 
+      {s ? (
+        <p style={{ ...muted, fontSize: 12.5, margin: "12px 2px 0" }}>
+          {num(s.buy_count)} BUY · {num(s.watch_count)} WATCH · {num(s.skip_count)} SKIP across {num(s.total_scored)}{" "}
+          scored products. {num(s.priced_last_24h)} of them have prices from the last 24 hours — the rest refresh at
+          35 products every 15 minutes, so this list firms up as fresh prices arrive.
+          {unspent != null && unspent >= 1 && plan.length > 0
+            ? ` ${gbp(unspent)} of the budget is unused because nothing else currently clears every check.`
+            : null}
+        </p>
+      ) : null}
+
       <Section
-        title="Buy list"
-        sub="Cleared by Amazon's real SP-API restrictions check — create the listing via SP-API, then place a test-mode BeautyFort order once it's live. Product type and attributes are looked up live from Amazon's own Catalog API for the ASIN."
-        right={<ExportCsvButton {...toCsvTable(buyList, BUY_LIST_COLUMNS)} filenamePrefix="buy-list" />}
+        title="Buy plan"
+        sub="Ranked by profit per month for every pound spent. Each quantity is 30 days of the sales you can expect after splitting the listing with the other sellers, capped by supplier stock and the budget. Profit uses Amazon's real referral and FBA fees for each product and never assumes a price above the 90-day average."
+        right={<ExportCsvButton {...toCsvTable(plan, BUY_PLAN_COLUMNS)} filenamePrefix="buy-plan" label="Export order sheet" />}
       >
         <DataCard>
           <div style={{ overflowX: "auto" }}>
             <table>
               <thead>
                 <tr>
-                  <th style={th}>ASIN</th>
+                  <th style={th}>#</th>
                   <th style={th}>Product</th>
-                  <th style={th}>Score</th>
-                  <th style={th}>Selling price</th>
-                  <th style={th}>Margin</th>
-                  <th style={th}>ROI</th>
-                  <th style={th}>Contribution</th>
-                  <th style={th}>Qty to order</th>
-                  <th style={th}>Capital required</th>
-                  <th style={th}>Competition</th>
-                  <th style={th}>Risks</th>
+                  <th style={th}>Order</th>
+                  <th style={th}>Cost inc VAT</th>
+                  <th style={th}>Profit / unit</th>
+                  <th style={th}>Sells / month</th>
+                  <th style={th}>Profit / month</th>
                   <th style={th}>Listing / Order</th>
                 </tr>
               </thead>
               <tbody>
-                {buyList.length === 0 ? (
-                  <EmptyRow colSpan={12} label="No listable buy candidates right now." />
+                {plan.length === 0 ? (
+                  <EmptyRow
+                    colSpan={8}
+                    label="Nothing clears every check right now — see “Unlock more profit” below for what's closest."
+                  />
                 ) : (
-                  buyList.map((c) => (
-                    <tr key={c.asin}>
-                      <td style={td}>
-                        <a href={`https://www.amazon.co.uk/dp/${c.asin}`} target="_blank" rel="noreferrer">
-                          {c.asin}
-                        </a>
-                      </td>
-                      <td style={td}>
-                        {c.product_title ?? "—"}
-                        {c.brand ? <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.brand}</div> : null}
-                      </td>
-                      <td style={{ ...td }} className="tabular">
-                        {num(c.score)}
-                      </td>
-                      <td style={{ ...td }} className="tabular">
-                        {gbp(c.selling_price)}
-                      </td>
-                      <td style={{ ...td }} className="tabular">
-                        {pct(c.margin)}
-                      </td>
-                      <td style={{ ...td }} className="tabular">
-                        {pct(c.roi)}
+                  plan.map((r) => {
+                    const note = qtyNote(r);
+                    return (
+                      <tr key={r.asin}>
+                        <td style={{ ...td, color: "var(--text-muted)" }} className="tabular">
+                          {r.plan_rank}
+                        </td>
+                        <td style={{ ...td, maxWidth: 320 }}>
+                          {r.product_title ?? "—"}
+                          <div style={muted}>
+                            {[r.brand, r.supplier_sku].filter(Boolean).join(" · ")}
+                            {" · "}
+                            <a href={`https://www.amazon.co.uk/dp/${r.asin}`} target="_blank" rel="noreferrer">
+                              {r.asin}
+                            </a>
+                          </div>
+                          <div style={{ ...muted, marginTop: 2 }}>
+                            Sells at {gbp(r.selling_price)} · fees {gbp(r.amazon_referral_fee)} referral +{" "}
+                            {gbp(r.fba_fulfilment_fee)} FBA · {r.seller_count != null ? `${num(r.seller_count)} sellers` : "sellers unknown"}
+                          </div>
+                        </td>
+                        <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                          {num(r.order_qty)}
+                          {note ? <div style={{ ...muted, fontWeight: 400 }}>{note}</div> : null}
+                        </td>
+                        <td style={td} className="tabular">
+                          {gbp(r.order_cash_inc_vat)}
+                          <div style={muted}>{gbp(r.unit_cost_inc_vat)} each</div>
+                        </td>
+                        <td style={td} className="tabular">
+                          {gbp(r.profit_per_unit)}
+                          <div style={muted}>ROI {pct(r.roi)}</div>
+                        </td>
+                        <td style={td} className="tabular">
+                          {num(r.est_units_month)}
+                          <div style={muted}>of {num(r.market_units_month)} total</div>
+                        </td>
+                        <td style={{ ...td, fontWeight: 600, color: "var(--status-good)" }} className="tabular">
+                          {gbp(r.monthly_profit)}
+                        </td>
+                        <td style={td}>
+                          <ListingOrderButtons
+                            opportunityId={r.opportunity_id}
+                            initialListingStatus={r.listing_status}
+                            initialListingIssues={null}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      <Section
+        title="Unlock more profit"
+        sub={`Products that would earn money but are held back by one thing — ranked by expected profit per month${
+          watch.length ? ` (${gbp(watchProfit)}/month across these ${num(watch.length)})` : ""
+        }. Most often that's brand or category approval on Seller Central.`}
+        right={<ExportCsvButton {...toCsvTable(watch, WATCH_COLUMNS)} filenamePrefix="watch-list" />}
+      >
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>Product</th>
+                  <th style={th}>Profit / month</th>
+                  <th style={th}>Profit / unit</th>
+                  <th style={th}>What&apos;s blocking it</th>
+                  <th style={th}>Competition</th>
+                </tr>
+              </thead>
+              <tbody>
+                {watch.length === 0 ? (
+                  <EmptyRow colSpan={5} label="Nothing on the watch list has sales data yet." />
+                ) : (
+                  watch.map((w) => (
+                    <tr key={w.asin}>
+                      <td style={{ ...td, maxWidth: 320 }}>
+                        {w.product_title ?? "—"}
+                        <div style={muted}>
+                          {w.brand ? `${w.brand} · ` : null}
+                          <a href={`https://www.amazon.co.uk/dp/${w.asin}`} target="_blank" rel="noreferrer">
+                            {w.asin}
+                          </a>
+                        </div>
                       </td>
                       <td style={{ ...td, fontWeight: 600 }} className="tabular">
-                        {gbp(c.contribution)}
+                        {gbp(w.est_monthly_profit)}
+                        <div style={{ ...muted, fontWeight: 400 }}>{num(w.est_units_month)} sales/month</div>
                       </td>
-                      <td style={{ ...td }} className="tabular">
-                        {num(c.quantity_to_order)}
-                        {c.supplier_stock != null ? (
-                          <span style={{ color: "var(--text-muted)" }}> / {num(c.supplier_stock)} in stock</span>
-                        ) : null}
+                      <td style={td} className="tabular">
+                        {gbp(w.profit_per_unit)}
+                        <div style={muted}>margin {pct(w.margin)}</div>
                       </td>
-                      <td style={{ ...td }} className="tabular">
-                        {gbp(c.capital_required)}
-                      </td>
+                      <td style={td}>{w.reason ?? "—"}</td>
                       <td style={td}>
-                        <CompetitionCell sellerCount={c.seller_count} amazonPresent={c.amazon_present} />
-                      </td>
-                      <td style={td}>
-                        <RiskChips risks={c.risks} />
-                      </td>
-                      <td style={td}>
-                        <ListingOrderButtons
-                          opportunityId={c.opportunity_id}
-                          initialListingStatus={c.listing_status}
-                          initialListingIssues={c.listing_issues}
-                        />
+                        <CompetitionCell sellerCount={w.seller_count} amazonPresent={w.amazon_present} />
                       </td>
                     </tr>
                   ))
@@ -230,9 +333,10 @@ export default async function Page() {
 
       <Section
         title="Eligible SKUs"
-        sub={`Every catalog SKU cleared by Amazon's real SP-API restrictions check — top 50 by score. ${num(
+        collapsible
+        sub={`Every catalog SKU cleared by Amazon's SP-API restrictions check — top 50 by score. ${num(
           data.eligible_skus_summary.scored
-        )} of ${num(data.eligible_skus_summary.total_eligible)} have gone through profitability scoring so far; the rest are awaiting fresh price/competition data before they can be scored.`}
+        )} of ${num(data.eligible_skus_summary.total_eligible)} have been scored so far.`}
         right={
           <ExportCsvButton
             {...toCsvTable(data.eligible_skus, ELIGIBLE_SKU_COLUMNS)}
@@ -313,8 +417,10 @@ export default async function Page() {
       </Section>
 
       <footer style={{ marginTop: 40, paddingTop: 16, borderTop: "1px solid var(--gridline)", fontSize: 12, color: "var(--text-muted)" }}>
-        All figures come straight from the n8n automation pipeline&apos;s Postgres database — nothing on this page is
-        estimated or AI-generated. Generated at {new Date(data.generated_at).toLocaleString("en-GB")}.
+        All figures come straight from the n8n automation pipeline&apos;s Postgres database. Sales per month are
+        Keepa&apos;s published monthly sales or, where Keepa doesn&apos;t publish one, 30-day sales-rank drops (a
+        conservative undercount), split evenly across the sellers on the listing. Nothing on this page is
+        AI-generated. Generated at {new Date(data.generated_at).toLocaleString("en-GB")}.
       </footer>
     </main>
   );
