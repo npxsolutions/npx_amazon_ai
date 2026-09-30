@@ -1,11 +1,8 @@
 "use client";
 
-export interface CsvColumn<T> {
-  label: string;
-  get: (row: T) => string | number | null | undefined;
-}
+import type { CsvCell } from "@/lib/csv";
 
-function csvCell(value: string | number | null | undefined): string {
+function csvCell(value: CsvCell): string {
   if (value === null || value === undefined) return "";
   const s = String(value);
   if (/[",\n]/.test(s)) {
@@ -14,21 +11,21 @@ function csvCell(value: string | number | null | undefined): string {
   return s;
 }
 
-export default function ExportCsvButton<T>({
-  rows,
-  columns,
+export default function ExportCsvButton({
+  header,
+  data: rows,
   filenamePrefix,
   label,
 }: {
-  rows: T[];
-  columns: CsvColumn<T>[];
+  header: string[];
+  data: CsvCell[][];
   filenamePrefix: string;
   label?: string;
 }) {
   function handleExport() {
-    const header = columns.map((c) => csvCell(c.label)).join(",");
-    const lines = rows.map((row) => columns.map((c) => csvCell(c.get(row))).join(","));
-    const csv = [header, ...lines].join("\r\n");
+    const headerLine = header.map(csvCell).join(",");
+    const lines = rows.map((row) => row.map(csvCell).join(","));
+    const csv = [headerLine, ...lines].join("\r\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

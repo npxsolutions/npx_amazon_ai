@@ -4,7 +4,8 @@ import StatTile from "@/components/StatTile";
 import Section from "@/components/Section";
 import DataCard, { th, td, EmptyRow } from "@/components/DataCard";
 import ListingOrderButtons from "@/components/ListingOrderButtons";
-import ExportCsvButton, { CsvColumn } from "@/components/ExportCsvButton";
+import ExportCsvButton from "@/components/ExportCsvButton";
+import { toCsvTable, type CsvColumn } from "@/lib/csv";
 import AutoRefresh from "@/components/AutoRefresh";
 import Badge from "@/components/Badge";
 import type { BuyCandidate, EligibleSku } from "@/lib/types";
@@ -97,7 +98,7 @@ export default async function Page() {
       <Section
         title="Buy list"
         sub="Cleared by Amazon's real SP-API restrictions check — create the listing via SP-API, then place a test-mode BeautyFort order once it's live. Product type and attributes are looked up live from Amazon's own Catalog API for the ASIN."
-        right={<ExportCsvButton rows={buyList} columns={BUY_LIST_COLUMNS} filenamePrefix="buy-list" />}
+        right={<ExportCsvButton {...toCsvTable(buyList, BUY_LIST_COLUMNS)} filenamePrefix="buy-list" />}
       >
         <DataCard>
           <div style={{ overflowX: "auto" }}>
@@ -178,8 +179,7 @@ export default async function Page() {
         )} of ${num(data.eligible_skus_summary.total_eligible)} have gone through profitability scoring so far; the rest are awaiting fresh price/competition data before they can be scored.`}
         right={
           <ExportCsvButton
-            rows={data.eligible_skus}
-            columns={ELIGIBLE_SKU_COLUMNS}
+            {...toCsvTable(data.eligible_skus, ELIGIBLE_SKU_COLUMNS)}
             filenamePrefix="eligible-skus"
             label="Export all eligible"
           />
