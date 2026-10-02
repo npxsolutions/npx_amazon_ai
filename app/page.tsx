@@ -8,7 +8,53 @@ import ExportCsvButton from "@/components/ExportCsvButton";
 import { toCsvTable, type CsvColumn } from "@/lib/csv";
 import AutoRefresh from "@/components/AutoRefresh";
 import Badge from "@/components/Badge";
-import type { BuyPlanRow, EligibleSku, UnlockAction, WatchRow } from "@/lib/types";
+import type { BuyPlanRow, EligibleSku, SellableRow, UnlockAction, UnlockProduct, WatchRow } from "@/lib/types";
+
+const pctText = (v: number | null) => (v != null ? (v * 100).toFixed(1) + "%" : null);
+
+// Full export of everything sellable without brand approval (not just the fast sellers shown).
+const SELLABLE_COLUMNS: CsvColumn<SellableRow>[] = [
+  { label: "Supplier SKU", get: (r) => r.supplier_sku },
+  { label: "ASIN", get: (r) => r.asin },
+  { label: "Product", get: (r) => r.product_title },
+  { label: "Brand", get: (r) => r.brand },
+  { label: "Verdict", get: (r) => r.verdict },
+  { label: "Reason", get: (r) => r.reason },
+  { label: "Your sales per month", get: (r) => r.units_month },
+  { label: "Listing sales per month (all sellers)", get: (r) => r.market_units_month },
+  { label: "Sellers on listing", get: (r) => r.seller_count },
+  { label: "Amazon on listing", get: (r) => (r.amazon_present ? "yes" : "no") },
+  { label: "Live Buy Box", get: (r) => (r.live_buy_box ? "yes" : "no") },
+  { label: "Selling price (GBP)", get: (r) => r.selling_price },
+  { label: "Unit cost ex VAT (GBP)", get: (r) => r.unit_cost_ex_vat },
+  { label: "Unit cost inc VAT (GBP)", get: (r) => r.unit_cost_inc_vat },
+  { label: "Profit per unit (GBP)", get: (r) => r.profit_per_unit },
+  { label: "Margin", get: (r) => pctText(r.margin) },
+  { label: "ROI", get: (r) => pctText(r.roi) },
+  { label: "Profit per month (GBP)", get: (r) => r.profit_month },
+  { label: "30-day qty", get: (r) => r.qty_30d },
+  { label: "30-day cash inc VAT (GBP)", get: (r) => r.cash_30d_inc_vat },
+  { label: "BeautyFort stock", get: (r) => r.supplier_stock },
+  { label: "Hazmat blocked (Amazon)", get: (r) => (r.hazmat_blocked ? "yes" : "no") },
+  { label: "Last priced", get: (r) => r.last_priced_at },
+];
+
+const UNLOCK_PRODUCT_COLUMNS: CsvColumn<UnlockProduct>[] = [
+  { label: "Approval needed", get: (u) => (u.blocker === "hazmat" ? "Dangerous goods (hazmat)" : `Brand: ${u.brand ?? "?"}`) },
+  { label: "Supplier SKU", get: (u) => u.supplier_sku },
+  { label: "ASIN", get: (u) => u.asin },
+  { label: "Product", get: (u) => u.product_title },
+  { label: "Unit cost ex VAT (GBP)", get: (u) => u.unit_cost_ex_vat },
+  { label: "Profit per unit (GBP)", get: (u) => u.profit_per_unit },
+  { label: "Margin", get: (u) => pctText(u.margin) },
+  { label: "ROI", get: (u) => pctText(u.roi) },
+  { label: "Your sales per month", get: (u) => u.units_month },
+  { label: "Profit per month (GBP)", get: (u) => u.profit_month },
+  { label: "30-day qty", get: (u) => u.qty_30d },
+  { label: "30-day cash inc VAT (GBP)", get: (u) => u.cash_30d_inc_vat },
+  { label: "BeautyFort stock", get: (u) => u.supplier_stock },
+  { label: "This approval alone unlocks it", get: (u) => (u.unlocks_alone ? "yes" : "no — " + (u.blockers ?? []).join(", ")) },
+];
 
 // Supplier order sheet: exactly what to put on the BeautyFort PO.
 const BUY_PLAN_COLUMNS: CsvColumn<BuyPlanRow>[] = [
@@ -238,6 +284,64 @@ function Breakdown({ r }: { r: BuyPlanRow }) {
   );
 }
 
+/** Expandable list of the products one approval opens up (pick an ASIN to apply with). */
+function UnlockProductList({ products }: { products: UnlockProduct[] }) {
+  if (!products.length) return null;
+  const cell: React.CSSProperties = { padding: "4px 10px 4px 0", fontSize: 12, verticalAlign: "top" };
+  return (
+    <details style={{ marginTop: 6 }}>
+      <summary style={{ ...muted, cursor: "pointer", color: "var(--text-secondary)" }}>
+        Show {num(products.length)} product{products.length === 1 ? "" : "s"}
+      </summary>
+      <div style={{ overflowX: "auto", marginTop: 6 }}>
+        <table>
+          <thead>
+            <tr>
+              {["Product", "Profit / unit", "Sells / month", "Profit / month", "30 days", "BF stock"].map((h) => (
+                <th key={h} style={{ ...cell, ...muted, textAlign: "left", fontWeight: 600 }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={`${p.blocker}-${p.asin}`}>
+                <td style={{ ...cell, maxWidth: 300 }}>
+                  {p.product_title ?? "—"}
+                  <div style={muted}>
+                    {p.supplier_sku ? `${p.supplier_sku} · ` : ""}
+                    <a href={`https://www.amazon.co.uk/dp/${p.asin}`} target="_blank" rel="noreferrer">
+                      {p.asin}
+                    </a>
+                    {p.unlocks_alone ? "" : " · also needs: " + (p.blockers ?? []).filter((b) => b !== p.blocker).join(", ").replace(/_/g, " ")}
+                  </div>
+                </td>
+                <td style={cell} className="tabular">
+                  {gbp(p.profit_per_unit)}
+                  <div style={muted}>{pct(p.margin)} margin</div>
+                </td>
+                <td style={cell} className="tabular">
+                  {num(p.units_month)}
+                </td>
+                <td style={{ ...cell, fontWeight: 600 }} className="tabular">
+                  {gbp(p.profit_month)}
+                </td>
+                <td style={cell} className="tabular">
+                  {num(p.qty_30d)} · {gbp(p.cash_30d_inc_vat)}
+                </td>
+                <td style={cell} className="tabular">
+                  {p.supplier_stock != null ? num(p.supplier_stock) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 const muted: React.CSSProperties = { fontSize: 11.5, color: "var(--text-muted)" };
 
 export const dynamic = "force-dynamic";
@@ -263,6 +367,14 @@ export default async function Page() {
   const plan = data.buy_plan ?? [];
   const watch = data.watch_list ?? [];
   const unlocks = data.unlock_actions ?? [];
+  const unlockProducts = data.unlock_products ?? [];
+  const productsFor = (u: UnlockAction) =>
+    unlockProducts.filter((p) => p.blocker === u.blocker && (p.brand ?? null) === (u.brand ?? null));
+  const sellable = data.sellable_now ?? [];
+  const fastSellers = sellable
+    .filter((r) => (r.profit_per_unit ?? 0) > 0 && !r.hazmat_blocked && (r.units_month ?? 0) > 0)
+    .sort((a, b) => (b.units_month ?? 0) - (a.units_month ?? 0))
+    .slice(0, 40);
   const unlockProfit = unlocks.reduce((sum, u) => sum + (u.monthly_profit_alone ?? 0), 0);
   const s = data.buy_plan_summary;
   const budget = s?.budget_inc_vat ?? null;
@@ -433,11 +545,99 @@ export default async function Page() {
       </Section>
 
       <Section
+        title="Sell now — fast sellers"
+        sub={`Products you can list today without brand approval that make a profit after every fee and prep cost, fastest-selling first (top ${num(
+          fastSellers.length
+        )}). The export has all ${num(sellable.length)} sellable products, including ones that don't currently make money.`}
+        right={
+          <ExportCsvButton
+            {...toCsvTable(sellable, SELLABLE_COLUMNS)}
+            filenamePrefix="sellable-now"
+            label="Export all sellable"
+          />
+        }
+      >
+        <DataCard>
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={th}>Product</th>
+                  <th style={th}>Verdict</th>
+                  <th style={th}>Sells / month</th>
+                  <th style={th}>Profit / unit</th>
+                  <th style={th}>Profit / month</th>
+                  <th style={th}>30 days</th>
+                  <th style={th}>BF stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fastSellers.length === 0 ? (
+                  <EmptyRow colSpan={7} label="No profitable sellable products with sales data yet." />
+                ) : (
+                  fastSellers.map((r) => (
+                    <tr key={r.asin}>
+                      <td style={{ ...td, maxWidth: 360 }}>
+                        {r.product_title ?? "—"}
+                        <div style={muted}>
+                          {[r.brand, r.supplier_sku].filter(Boolean).join(" · ")}
+                          {" · "}
+                          <a href={`https://www.amazon.co.uk/dp/${r.asin}`} target="_blank" rel="noreferrer">
+                            {r.asin}
+                          </a>
+                        </div>
+                      </td>
+                      <td style={td}>
+                        {r.verdict ? <Badge label={r.verdict} /> : "—"}
+                        {r.verdict !== "BUY" && r.reason ? <div style={{ ...muted, maxWidth: 220 }}>{r.reason}</div> : null}
+                      </td>
+                      <td style={{ ...td, fontWeight: 600 }} className="tabular">
+                        {num(r.units_month)}
+                        <div style={{ ...muted, fontWeight: 400 }}>
+                          of {num(r.market_units_month)} · {r.seller_count != null ? `${num(r.seller_count)} sellers` : "?"}
+                          {r.amazon_present ? " · Amazon" : ""}
+                        </div>
+                      </td>
+                      <td style={td} className="tabular">
+                        {gbp(r.profit_per_unit)}
+                        <div style={muted}>
+                          {pct(r.margin)} margin · {pct(r.roi)} ROI
+                        </div>
+                      </td>
+                      <td style={{ ...td, fontWeight: 600, color: "var(--status-good)" }} className="tabular">
+                        {gbp(r.profit_month)}
+                      </td>
+                      <td style={td} className="tabular">
+                        {num(r.qty_30d)} units
+                        <div style={muted}>{gbp(r.cash_30d_inc_vat)} inc VAT</div>
+                      </td>
+                      <td style={td} className="tabular">
+                        {r.supplier_stock != null ? num(r.supplier_stock) : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </DataCard>
+      </Section>
+
+      <Section
         title="Unlock more profit"
         sub={`Approvals that open up products which already clear every profit check — ranked by the profit they'd add each month.${
           unlockProfit > 0 ? ` Doing all of these unlocks at least ${gbp(unlockProfit)}/month on their own.` : ""
         } Numbers grow as more of the catalogue gets priced.`}
-        right={<ExportCsvButton {...toCsvTable(unlocks, UNLOCK_COLUMNS)} filenamePrefix="unlock-actions" />}
+        right={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <ExportCsvButton {...toCsvTable(unlocks, UNLOCK_COLUMNS)} filenamePrefix="unlock-actions" label="Export approvals" />
+            <ExportCsvButton
+              {...toCsvTable(unlockProducts, UNLOCK_PRODUCT_COLUMNS)}
+              filenamePrefix="unlock-products"
+              label="Export all products"
+            />
+          </div>
+        }
       >
         <DataCard>
           <div style={{ overflowX: "auto" }}>
@@ -459,6 +659,7 @@ export default async function Page() {
                       <td style={{ ...td, maxWidth: 460 }}>
                         <span style={{ fontWeight: 600 }}>{unlockTitle(u)}</span>
                         <div style={muted}>{unlockHow(u)}</div>
+                        <UnlockProductList products={productsFor(u)} />
                       </td>
                       <td style={{ ...td, fontWeight: 600, color: "var(--status-good)" }} className="tabular">
                         {gbp(u.monthly_profit)}

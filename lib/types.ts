@@ -210,6 +210,53 @@ export interface BuyPlanSummary {
   total_scored: number;
 }
 
+// Every ASIN the seller can list today without brand approval, scored by 07.
+export interface SellableRow {
+  asin: string;
+  supplier_sku: string | null;
+  product_title: string | null;
+  brand: string | null;
+  verdict: "BUY" | "WATCH" | "SKIP" | string | null;
+  reason: string | null;
+  units_month: number | null;
+  market_units_month: number | null;
+  seller_count: number | null;
+  amazon_present: boolean | null;
+  live_buy_box: boolean | null;
+  selling_price: number | null;
+  profit_per_unit: number | null;
+  margin: number | null;
+  roi: number | null;
+  profit_month: number | null;
+  qty_30d: number | null;
+  cash_30d_inc_vat: number | null;
+  unit_cost_inc_vat: number | null;
+  unit_cost_ex_vat: number | null;
+  supplier_stock: number | null;
+  hazmat_blocked: boolean | null;
+  last_priced_at: string | null;
+}
+
+// One product behind an approval in unlock_actions.
+export interface UnlockProduct {
+  blocker: string;
+  brand: string | null;
+  asin: string;
+  supplier_sku: string | null;
+  product_title: string | null;
+  profit_per_unit: number | null;
+  margin: number | null;
+  roi: number | null;
+  units_month: number | null;
+  profit_month: number | null;
+  qty_30d: number | null;
+  cash_30d_inc_vat: number | null;
+  unit_cost_ex_vat: number | null;
+  supplier_stock: number | null;
+  unlocks_alone: boolean | null;
+  blockers: string[] | null;
+}
+
 // One approval you could get, and the profitable products it would open up (07 blockers[]).
 export interface UnlockAction {
   blocker: "brand_approval" | "hazmat" | string;
@@ -382,6 +429,8 @@ export interface DashboardPayload {
   buy_plan_summary?: BuyPlanSummary | null;
   watch_list?: WatchRow[];
   unlock_actions?: UnlockAction[];
+  unlock_products?: UnlockProduct[];
+  sellable_now?: SellableRow[];
   opportunity_counts: { buy_candidate: number; review: number; reject: number; top_score: number | null };
   eligible_skus: EligibleSku[];
   eligible_skus_summary: EligibleSkusSummary;
