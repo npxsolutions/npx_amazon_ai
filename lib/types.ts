@@ -212,6 +212,9 @@ export interface BuyPlanSummary {
 
 // Every ASIN the seller can list today without brand approval, scored by 07.
 export interface SellableRow {
+  opportunity_id: number;
+  listing_status: string | null;
+  listing_issues: unknown[] | null;
   asin: string;
   supplier_sku: string | null;
   product_title: string | null;

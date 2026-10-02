@@ -569,11 +569,12 @@ export default async function Page() {
                   <th style={th}>Profit / month</th>
                   <th style={th}>30 days</th>
                   <th style={th}>BF stock</th>
+                  <th style={th}>Listing / Order</th>
                 </tr>
               </thead>
               <tbody>
                 {fastSellers.length === 0 ? (
-                  <EmptyRow colSpan={7} label="No profitable sellable products with sales data yet." />
+                  <EmptyRow colSpan={8} label="No profitable sellable products with sales data yet." />
                 ) : (
                   fastSellers.map((r) => (
                     <tr key={r.asin}>
@@ -613,6 +614,13 @@ export default async function Page() {
                       </td>
                       <td style={td} className="tabular">
                         {r.supplier_stock != null ? num(r.supplier_stock) : "—"}
+                      </td>
+                      <td style={td}>
+                        <ListingOrderButtons
+                          opportunityId={r.opportunity_id}
+                          initialListingStatus={r.listing_status}
+                          initialListingIssues={r.listing_issues}
+                        />
                       </td>
                     </tr>
                   ))
