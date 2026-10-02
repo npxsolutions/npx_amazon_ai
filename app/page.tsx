@@ -33,6 +33,7 @@ const BUY_PLAN_COLUMNS: CsvColumn<BuyPlanRow>[] = [
   { label: "FBA fee (GBP)", get: (r) => r.fba_fulfilment_fee },
   { label: "Digital services fee (GBP)", get: (r) => r.digital_services_fee },
   { label: "Total Amazon fees (GBP)", get: (r) => totalFees(r) },
+  { label: "Prep centre per unit (GBP)", get: (r) => prepCost(r) },
   { label: "Profit per unit (GBP)", get: (r) => r.profit_per_unit },
   { label: "Margin", get: (r) => (r.margin != null ? (r.margin * 100).toFixed(1) + "%" : null) },
   { label: "ROI", get: (r) => (r.roi != null ? (r.roi * 100).toFixed(1) + "%" : null) },
@@ -160,6 +161,20 @@ function totalFees(r: BuyPlanRow): number | null {
   return round2((r.amazon_referral_fee ?? 0) + (r.fba_fulfilment_fee ?? 0) + (r.digital_services_fee ?? 0));
 }
 
+/**
+ * Prep-centre cost per unit (label + polybag), as charged in scoring. Not stored as its own
+ * field: it is exactly what is left after VAT, Amazon fees, product cost and profit.
+ */
+function prepCost(r: BuyPlanRow): number | null {
+  if (r.net_revenue == null || r.profit_per_unit == null) return null;
+  const cost = r.effective_unit_cost ?? r.unit_cost_ex_vat;
+  if (cost == null) return null;
+  const v = round2(
+    r.net_revenue - (r.amazon_referral_fee ?? 0) - (r.fba_fulfilment_fee ?? 0) - (r.digital_services_fee ?? 0) - cost - r.profit_per_unit
+  );
+  return v > 0 ? v : 0;
+}
+
 function priceBasisLabel(basis: string | null): string {
   switch (basis) {
     case "live_buy_box":
@@ -203,6 +218,7 @@ function Breakdown({ r }: { r: BuyPlanRow }) {
           )}
           {line("FBA fee", gbp(r.fba_fulfilment_fee), { minus: true, note: keepaFees ? "Amazon's fee for this item" : "estimate" })}
           {line("Digital services fee", gbp(r.digital_services_fee), { minus: true })}
+          {line("Prep centre", gbp(prepCost(r)), { minus: true, note: "label + polybag" })}
           {line("Your cost ex VAT", gbp(r.effective_unit_cost ?? r.unit_cost_ex_vat), { minus: true, note: "VAT reclaimed" })}
           {line("Profit per unit", gbp(r.profit_per_unit), { strong: true, note: `${pct(r.margin, 1)} margin · ${pct(r.roi)} ROI` })}
         </tbody>
@@ -307,7 +323,7 @@ export default async function Page() {
 
       <Section
         title="Buy plan"
-        sub="Ranked by profit per month for every pound spent. Each quantity is 30 days of the sales you can expect after splitting the listing with the other sellers, capped by supplier stock and the budget. Profit uses Amazon's real referral and FBA fees for each product and never assumes a price above the 90-day average."
+        sub="Ranked by profit per month for every pound spent. Each quantity is 30 days of the sales you can expect after splitting the listing with the other sellers, capped by supplier stock and the budget. Profit uses Amazon's real referral and FBA fees for each product plus your prep-centre cost, and never assumes a price above the 90-day average."
         right={<ExportCsvButton {...toCsvTable(plan, BUY_PLAN_COLUMNS)} filenamePrefix="buy-plan" label="Export order sheet" />}
       >
         <DataCard>
