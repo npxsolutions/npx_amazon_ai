@@ -365,7 +365,10 @@ export default async function Page() {
   const productsFor = (u: UnlockAction) =>
     unlockProducts.filter((p) => p.blocker === u.blocker && (p.brand ?? null) === (u.brand ?? null));
   const sellable = data.sellable_now ?? [];
-  const fastSellers = sellable.filter((r) => (r.profit_per_unit ?? 0) > 0 && !r.hazmat_blocked && (r.units_month ?? 0) > 0);
+  // SKIP covers products you've excluded (e.g. ones you've decided not to sell) and restricted ASINs.
+  const fastSellers = sellable.filter(
+    (r) => (r.profit_per_unit ?? 0) > 0 && !r.hazmat_blocked && (r.units_month ?? 0) > 0 && r.verdict !== "SKIP"
+  );
 
   // Plain rows for the interactive tables (formatted secondary lines are built here, on the server).
   const planRows: Row[] = plan.map((r) => {
