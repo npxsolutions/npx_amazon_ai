@@ -451,3 +451,48 @@ export interface DashboardPayload {
   workflow_health: WorkflowHealthItem[];
   workflow_health_summary: WorkflowHealthSummary;
 }
+
+// BF Direct Dispatch tab — rows from the Supabase view public.bf_product_economics (via edge function bf-dd-data).
+export interface BfDirectDispatchRow {
+  bf_sku: string;
+  barcode: string | null;
+  brand: string | null;
+  product_name: string | null;
+  asin: string;
+  match_confidence: string | null;
+  cost_ex_vat: number | null;
+  cost_inc_vat: number | null;
+  total_cost_ex_vat: number | null;
+  bf_stock: number | null;
+  referral_pct: number | null;
+  breakeven_price: number | null;
+  price_10pct_margin: number | null;
+  price_20pct_margin: number | null;
+  price_30pct_margin: number | null;
+  price_40pct_margin: number | null;
+  buy_box_price: number | null;
+  buy_box_basis: "live" | "avg30" | null;
+  seller_count: number | null;
+  amazon_fees_at_buy_box: number | null;
+  profit_at_buy_box: number | null;
+  /** Percent, e.g. 26.1 */
+  margin_pct_at_buy_box: number | null;
+  rrp: number | null;
+  gating: string;
+  is_ungated: boolean;
+  is_exact_match: boolean;
+  in_stock: boolean;
+  has_buy_box: boolean;
+  profitable_at_buy_box: boolean;
+  amazon_on_listing: boolean;
+  buy_box_suspect: boolean;
+  ready_to_list: boolean;
+  in_bf_file: boolean;
+}
+
+export interface BfDirectDispatchPayload {
+  generated_at: string;
+  scope: "ungated" | "all";
+  stock_file_pulled_at: string | null;
+  rows: BfDirectDispatchRow[];
+}

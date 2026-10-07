@@ -7,6 +7,7 @@ import DataTable, { type Column, type DetailLine, type Row } from "@/components/
 import ExportCsvButton from "@/components/ExportCsvButton";
 import { toCsvTable, type CsvColumn } from "@/lib/csv";
 import AutoRefresh from "@/components/AutoRefresh";
+import NavTabs from "@/components/NavTabs";
 import Badge from "@/components/Badge";
 import type { BuyPlanRow, EligibleSku, SellableRow, UnlockAction, UnlockProduct, WatchRow } from "@/lib/types";
 
@@ -415,6 +416,7 @@ export default async function Page() {
 
   return (
     <main style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 20px 64px" }}>
+      <NavTabs active="buy" />
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>What to buy</h1>
